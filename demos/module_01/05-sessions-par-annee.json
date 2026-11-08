@@ -1,0 +1,17 @@
+{
+  "name": "Sessions par année",
+  "description": "Demande du planning : le nombre de sessions par année de début (clip 1.5).",
+  "type": "question",
+  "display": "line",
+  "visualization_settings": {},
+  "collection_id": null,
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@table:stage.session",
+      "aggregation": [["count"]],
+      "breakout": [["field", "@field:stage.session.datedebut", {"temporal-unit": "year"}]]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "Exercice 01",
+  "type": "question",
+  "display": "table",
+  "visualization_settings": {},
+  "collection_id": null,
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@table:contact.contact",
+      "aggregation": [["count"]],
+      "breakout": [["field", "@field:contact.contact.titre", null]]
+    }
+  }
+}
