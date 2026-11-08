@@ -1,0 +1,42 @@
+# Answers of Metabot to exercises/module_09/questions.txt, 8 November 2026, Metabase 0.65.3,
+# model openrouter/anthropic/claude-sonnet-4.6, sample database removed: ./bench/metabot.sh exercises/module_09/questions.txt
+== E01 (17 s): Combien de sociétés clientes l'organisme a-t-il ?
+   databases: 2 pachadataformation
+   tools: search, search, read_resource, load_skill, construct_notebook_query, run_query
+   answer: L'organisme compte **179 sociétés clientes**, d'après la table `contact.societe`.
+== E02 (89 s): Combien de factures ont été émises en 2010 ?
+   databases: 2 pachadataformation
+   tools: search, read_resource, load_skill, construct_notebook_query, run_query, read_resource, construct_notebook_query, construct_notebook_query, run_query, construct_notebook_query, run_query, construct_notebook_query, run_query
+   answer: Le résultat est 0, ce qui est surprenant. Laissez-moi vérifier les valeurs réelles du champ date dans la table source pour m'assurer du format et de la plage des données.Le modèle renvoie 0, probablement parce que les données sont déjà agrégées par la requête du modèle. Je vais interroger directement la table source.Le `time-interval` est relatif à aujourd'hui — il faut utiliser un filtre fixe sur 2010. Je corrige.Le résultat est 0. Les statistiques du champ montrent que la date la plus récente est 2011-11-29 — il semble qu'il n'y ait pas de factures en 2010. Vérifions la distribution par année.La table contient des données sur de nombreuses années. Laissez-moi voir si 2010 y figure en récupérant les années plus récentes.La réponse est claire : **il n'y a aucune facture émise en 2010** dans la base de données. La distribution des années montre que la table `inscription.facture` passe directement de 2007 à 2011 — les années 2008, 2009 et 2010 sont absentes des données. L'essentiel du volume se concentre en 2011 (6 514 factures), avec quelques centaines par an pour les années antérieures (jusqu'en 1953).
+== E03 (27 s): Quel est le montant moyen d'une facture de 2011 ?
+   databases: 2 pachadataformation
+   tools: search, load_skill, read_resource, construct_notebook_query, construct_notebook_query, run_query
+   answer: Le montant moyen d'une facture de 2011 est **3 451,95 €** (HT, avant remise). → [Montant moyen d'une facture en 2011](question) Calculé depuis le modèle [Factures](/model/88), en filtrant sur `datefacture` entre le 01/01/2011 et le 31/12/2011 et en faisant la moyenne de `montantht`.
+== E04 (23 s): Combien de sessions ont commencé en 2018 ?
+   databases: 2 pachadataformation
+   tools: load_skill, read_resource, construct_notebook_query, run_query
+   answer: La table `visite` contient une ligne par visite (page vue), avec le champ `jour` allant de 2015 à 2020. Je vais compter le nombre de visites en 2018.En 2018, **969 562 sessions** ont été enregistrées dans la table [visite](/table/59). > Note : chaque ligne de la table correspond à une visite de page du catalogue en ligne — le terme "session" ici équivaut à une visite individuelle telle que définie dans cette table.
+== E05 (15 s): Combien de contacts n'ont pas de société ?
+   databases: 2 pachadataformation
+   tools: search, read_resource, load_skill, construct_notebook_query, run_query
+   answer: **9 474 contacts** n'ont pas de société associée. Voir le résultat : [Contacts sans société](question) Le comptage porte sur la table [contact](/table/10) (`contact.contact`) en filtrant les lignes dont le champ `societeid` est NULL.
+== E06 (31 s): Combien d'inscriptions sont en liste d'attente ?
+   databases: 2 pachadataformation
+   tools: search, search, read_resource, load_skill, construct_notebook_query, run_query
+   answer: Il y a **7 499 inscriptions** en liste d'attente dans la table `inscription.inscription` (base *pachadataformation*), c'est-à-dire les lignes où le champ `listeattente` est à vrai.
+== E07 (40 s): Combien de factures de 2011 ont été relancées ?
+   databases: 6 Données de la facturation
+   tools: search, read_resource, search, read_resource, read_resource, load_skill, construct_notebook_query, run_query
+   answer: Le champ `relance` (entier) indique le nombre de relances envoyées — une valeur > 0 signifie que la facture a été relancée. Je vais compter les factures de 2011 avec au moins une relance, sur la base "Données de la facturation".**20 factures de 2011 ont été relancées** (c'est-à-dire ont un champ `relance` > 0) dans la table [`inscription.facture`](/table/70) de la base "Données de la facturation". > Note : j'ai filtré sur `datefacture` en 2011 et `relance > 0`. Si la notion de "relancée" dans votre contexte implique une autre condition (par ex. la `daterelance` plutôt que `datefacture`, ou un seuil différent de relances), dites-le moi et j'ajusterai.
+== E08 (35 s): Combien de stages n'ont jamais eu de session ?
+   databases: 2 pachadataformation
+   tools: search, read_resource, load_skill, construct_notebook_query, run_query
+   answer: Le résultat est **0** : tous les stages de la table `stage.stage` ont au moins une session dans `stage.session`. Il n'existe aucun stage sans session.
+== E09 (58 s): Combien de stagiaires étaient présents aux sessions de 2015 ?
+   databases: 2 pachadataformation
+   tools: search, search, read_resource, read_resource, read_resource, read_resource, load_skill, read_resource, construct_notebook_query, run_query
+   answer: J'ai trouvé les tables nécessaires : `inscription.inscription` (avec le champ `present`) et `stage.session` (avec `datedebut`). Je construis la requête.**344 stagiaires** étaient présents aux sessions de 2015. Voici le [Stagiaires présents aux sessions de 2015](question). Le résultat est obtenu en comptant les inscriptions avec `present = true` dont la session associée a une `datedebut` en 2015 (jointure entre `inscription.inscription` et `stage.session`).
+== E10 (30 s): Combien de formateurs différents ont animé au moins une session en 2016 ?
+   databases: 2 pachadataformation
+   tools: search, read_resource, load_skill, construct_notebook_query, construct_notebook_query, run_query
+   answer: Le filtre `time-interval` avec `1, "year"` cible l'année courante (2026). Je dois utiliser un filtre sur l'année 2016 spécifiquement.En 2016, **28 formateurs différents** ont animé au moins une session, en filtrant la table [session](/table/40) sur le champ `datedebut` (date de début de session) sur toute l'année 2016.

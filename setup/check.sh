@@ -49,6 +49,11 @@
 #     API key of the group (a count allowed on its connection, compared with the query of
 #     reference.sql; a table of another connection, SQL, and the collection, refused). Same exit
 #     codes; a right wider than the one asked gives 3.
+#   - "-- check: answers work/answer09.csv" (module 9): the file of answers you wrote after
+#     asking the questions of the exercise to Metabot is checked by setup/verify-answers.sh,
+#     line by line, against the readings that reference.sql computes: one line per question,
+#     each "juste" equal to a reading, each "faux" equal to none. It checks your verdicts, not
+#     the AI. A missing file gives 2, a missing or wrong verdict 3, a line without its fields 4.
 # The JSON answers of Metabase are read by PostgreSQL (jsonb), in the container: the script
 # needs bash and curl, nothing else.
 # Exit codes: 0 pass; 1 the lab or the check itself has a problem (a container stopped,
@@ -162,6 +167,13 @@ case "${kind:-card}" in
         # Module 7: the group of the exercise, its rights and its collections, read in the
         # graphs and tried under a temporary API key of the group, by setup/verify-permissions.sh.
         setup/verify-permissions.sh "$ref"
+        code=$?
+        [ "$code" = 0 ] && echo "Exercise $nn: passed."
+        exit "$code" ;;
+    answers\ *)
+        # Module 9: a file of answers written by hand, checked line by line against the
+        # readings of reference.sql by setup/verify-answers.sh.
+        setup/verify-answers.sh "$ref"
         code=$?
         [ "$code" = 0 ] && echo "Exercise $nn: passed."
         exit "$code" ;;

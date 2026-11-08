@@ -1,0 +1,23 @@
+# The bench of the course: twenty questions a department could ask, in French like the data.
+# Q01 to Q15 have one reading; Q16 to Q20 have two or more (bench/answers.sql gives each one).
+# One line per question: Qnn|question. ./bench/metabot.sh asks them to Metabot.
+Q01|Combien de stages différents l'organisme a-t-il dans son catalogue ?
+Q02|Combien de sessions commencent en 2015 ?
+Q03|Quel est le chiffre d'affaires hors taxes facturé en 2011 ?
+Q04|Combien d'inscriptions n'ont pas été annulées ?
+Q05|Quelles sont les cinq sociétés qui ont le plus d'inscriptions, avec leur nombre ?
+Q06|Quel est le prix moyen d'une session qui commence en 2016 ?
+Q07|Combien de contacts n'ont pas d'adresse email ?
+Q08|Combien de factures n'ont reçu aucun paiement ?
+Q09|Quel stage a eu le plus de sessions, et combien ?
+Q10|Parmi les inscriptions non annulées, quelle part des stagiaires était présente ?
+Q11|Quel lieu de formation a accueilli le plus de sessions ?
+Q12|Quel mois de 2019 a vu le plus d'inscriptions créées ?
+Q13|Combien a-t-on encaissé en paiements en 2011 ?
+Q14|Combien de personnes différentes se sont inscrites au moins une fois ?
+Q15|Quelle est la durée moyenne d'un stage, en jours ?
+Q16|Quel est le chiffre d'affaires de 2011 ?
+Q17|Combien d'inscriptions y a-t-il eu en 2019 ?
+Q18|Quel est le taux d'annulation des inscriptions ?
+Q19|Combien de stagiaires ont suivi une formation en 2016 ?
+Q20|Quelle est la remise moyenne accordée ?

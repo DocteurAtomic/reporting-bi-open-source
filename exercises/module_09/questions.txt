@@ -1,0 +1,12 @@
+# Exercise 9: ten questions to ask Metabot, one new conversation each. Qnn|question.
+# ./bench/metabot.sh exercises/module_09/questions.txt asks them through the API.
+E01|Combien de sociétés clientes l'organisme a-t-il ?
+E02|Combien de factures ont été émises en 2010 ?
+E03|Quel est le montant moyen d'une facture de 2011 ?
+E04|Combien de sessions ont commencé en 2018 ?
+E05|Combien de contacts n'ont pas de société ?
+E06|Combien d'inscriptions sont en liste d'attente ?
+E07|Combien de factures de 2011 ont été relancées ?
+E08|Combien de stages n'ont jamais eu de session ?
+E09|Combien de stagiaires étaient présents aux sessions de 2015 ?
+E10|Combien de formateurs différents ont animé au moins une session en 2016 ?

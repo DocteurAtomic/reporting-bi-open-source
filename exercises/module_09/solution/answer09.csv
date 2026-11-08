@@ -1,0 +1,11 @@
+question;chiffre;verdict;lecture
+E01;179;juste;toutes les sociétés de contact.societe (toutes ont un contact inscrit)
+E02;0;juste;aucune facture datée de 2010, dit après avoir relu la répartition par année
+E03;3 451,95;juste;hors taxes, avant remise, sur le modèle Factures
+E04;969 562;faux;les visites de entrepot.visite prises pour des sessions de stage (référence 365)
+E05;9 474;juste;contacts dont societeid est vide
+E06;7 499;juste;toutes les inscriptions en attente, annulées comprises
+E07;20;juste;relance > 0 en 2011, lu dans la connexion Données de la facturation
+E08;0;juste;aucun stage sans session
+E09;344;juste;inscriptions présentes, et non personnes distinctes (171)
+E10;28;juste;formateurs distincts des sessions de 2016
