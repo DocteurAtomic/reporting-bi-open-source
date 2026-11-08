@@ -12,6 +12,12 @@
 #     GET /api/card/<id> (neither 404 nor archived), run by POST /api/card/<id>/query, and its
 #     rows are compared with the rows of reference.sql run in psql (setup/compare-card.sql).
 #     The order of the rows is ignored, unless the line is "-- check: card ordered".
+#     A native question with variables is run with the values given by lines such as
+#     "-- check: parameter dimension periode date/all-options 2007-01-01~2007-12-31"
+#     (kind of target, dimension for a field filter or variable for a basic variable, name of
+#     the variable, type of the parameter, value), one line per variable, in the first ten
+#     lines: POST /api/card/<id>/query without parameters applies the default value of each
+#     variable and drops a field filter that has none, so the check passes the value itself.
 #   - "-- check: dashboard" (module 5) and "-- check: permissions" (module 7): not written yet
 #     in this state of the repository.
 # The JSON answers of Metabase are read by PostgreSQL (jsonb), in the container: the script
@@ -89,7 +95,7 @@ if [ ! -f "$ref" ]; then
     echo "No $ref in this state of the repository." >&2
     exit 1
 fi
-kind=$(head -5 "$ref" | sed -n 's/^-- check: *//p' | head -1)
+kind=$(head -5 "$ref" | sed -n '/^-- check: parameter /d; s/^-- check: *//p' | head -1)
 case "${kind:-card}" in
     card)         ordered=false ;;
     'card ordered') ordered=true ;;
@@ -140,7 +146,39 @@ if [ "$found" -gt 1 ]; then
 fi
 
 echo "Question \"$name\" (id $id):"
-code=$(mb_call POST "/api/card/$id/query" "$tmp/result.json")
+
+# The values of the variables, from the "-- check: parameter" lines of reference.sql. Each one
+# is sent with the id that the question gives to its variable; a variable missing from the
+# question is reported, and the rows then tell whether the answer holds; a basic variable where
+# the line asks for a field filter fails at once (code 2), as Metabase would refuse the value.
+params=
+while read -r target tag ptype pvalue; do
+    [ -n "$pvalue" ] || continue
+    code=$(mb_call GET "/api/card/$id" "$tmp/card.json")
+    IFS='|' read -r tag_id tag_type < <(json_sql "$tmp/card.json" "
+        select coalesce(t->>'id', ''), coalesce(t->>'type', '')
+          from j, lateral (select coalesce(doc->'dataset_query'->'stages'->0->'template-tags',
+                                           doc->'dataset_query'->'native'->'template-tags') as tags) q,
+               lateral (select e from jsonb_array_elements(case jsonb_typeof(q.tags) when 'array' then q.tags else '[]' end) e
+                        union all
+                        select v from jsonb_each(case jsonb_typeof(q.tags) when 'object' then q.tags else '{}' end) x(k, v)) w(t)
+         where t->>'name' = $(sql_text "$tag")")
+    if [ -z "$tag_id" ]; then
+        echo "Note: the question has no variable {{$tag}}; it runs without the value $pvalue."
+        continue
+    fi
+    if [ "$target" = dimension ] && [ "$tag_type" != dimension ]; then
+        verdict "FAIL error: {{$tag}} is a $tag_type variable, and the exercise asks for a field filter (variable type: field filter)"
+    fi
+    echo "Variable {{$tag}}: $pvalue"
+    params="$params${params:+,}{\"id\":$(json_text "$tag_id"),\"type\":$(json_text "$ptype"),\"target\":[\"$target\",[\"template-tag\",$(json_text "$tag")]],\"value\":$(json_text "$pvalue")}"
+done < <(head -10 "$ref" | sed -n 's/^-- check: parameter  *//p' | tr -d '\r')
+if [ -n "$params" ]; then
+    printf '{"parameters":[%s]}\n' "$params" > "$tmp/parameters.json"
+    code=$(mb_call POST "/api/card/$id/query" "$tmp/result.json" "$tmp/parameters.json")
+else
+    code=$(mb_call POST "/api/card/$id/query" "$tmp/result.json")
+fi
 status='|'
 if [ -s "$tmp/result.json" ]; then
     status=$(json_sql "$tmp/result.json" "

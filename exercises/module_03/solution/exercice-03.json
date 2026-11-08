@@ -1,0 +1,34 @@
+{
+  "name": "Exercice 03",
+  "display": "table",
+  "visualization_settings": {},
+  "collection_id": null,
+  "parameters": [
+    {
+      "id": "5f0e3a52-03aa-4c3b-9d1e-000000000003",
+      "type": "date/all-options",
+      "target": ["dimension", ["template-tag", "periode"]],
+      "name": "Période",
+      "slug": "periode",
+      "default": "2011-01-01~2011-12-31"
+    }
+  ],
+  "dataset_query": {
+    "database": "@database",
+    "type": "native",
+    "native": {
+      "query": "select count(*) as factures,\n       sum(montantht) as montant_ht\n  from inscription.facture\n where {{periode}}\n",
+      "template-tags": {
+        "periode": {
+          "id": "5f0e3a52-03aa-4c3b-9d1e-000000000003",
+          "name": "periode",
+          "display-name": "Période",
+          "type": "dimension",
+          "dimension": ["field", "@inscription.facture.datefacture", null],
+          "widget-type": "date/all-options",
+          "default": "2011-01-01~2011-12-31"
+        }
+      }
+    }
+  }
+}
