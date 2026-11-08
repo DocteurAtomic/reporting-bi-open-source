@@ -1,0 +1,16 @@
+{
+  "name": "Factures de 2011 par société",
+  "display": "table",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@card:Factures",
+      "filter": ["between", ["field", "datefacture", {"base-type": "type/Date"}], "2011-01-01", "2011-12-31"],
+      "aggregation": [["count"]],
+      "breakout": [["field", "nom", {"base-type": "type/Text"}]],
+      "order-by": [["desc", ["aggregation", 0]]]
+    }
+  }
+}

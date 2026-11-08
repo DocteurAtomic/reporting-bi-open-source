@@ -1,0 +1,7 @@
+{
+  "facturecd":   {"display_name": "Facture", "description": "Le code de la facture, unique."},
+  "datefacture": {"display_name": "Date de facture", "description": "La date de la facture. Vide pour 105 factures, qui comptent dans le total et dans aucune année."},
+  "montantht":   {"display_name": "Montant HT", "description": "Le montant de la facture hors taxes, avant remise. C'est la colonne du chiffre d'affaires."},
+  "nom":         {"display_name": "Société", "description": "La société du contact inscrit. Vide quand l'inscription n'a pas de contact, ou que le contact n'a pas de société."},
+  "count":       {"display_name": "Inscriptions facturées", "description": "Le nombre d'inscriptions que la facture couvre. La facture et son montant ne comptent qu'une fois, quel que soit ce nombre."}
+}

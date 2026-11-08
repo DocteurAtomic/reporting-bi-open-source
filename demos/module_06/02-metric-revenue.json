@@ -1,0 +1,15 @@
+{
+  "name": "Chiffre d'affaires HT",
+  "type": "metric",
+  "display": "scalar",
+  "description": "La somme des montants hors taxes des factures, chaque facture une fois, avant remise. Source : le modèle Factures. Exclut les encaissements (voir Paiements par mode) et ne répartit pas une facture entre les stages qu'elle couvre.",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@card:Factures",
+      "aggregation": [["sum", ["field", "montantht", {"base-type": "type/Decimal"}]]]
+    }
+  }
+}

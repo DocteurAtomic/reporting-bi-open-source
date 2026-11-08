@@ -1,0 +1,14 @@
+{
+  "name": "Exercice 06",
+  "display": "scalar",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@inscription.suivifacture",
+      "aggregation": [["metric", "@metric:Encaissements"]],
+      "filter": ["between", ["field", "@inscription.suivifacture.datepaiement", null], "2011-01-01", "2011-12-31"]
+    }
+  }
+}

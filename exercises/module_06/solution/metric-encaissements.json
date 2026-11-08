@@ -1,0 +1,15 @@
+{
+  "name": "Encaissements",
+  "type": "metric",
+  "display": "scalar",
+  "description": "La somme des paiements reçus (suivifacture.montant), datés par la date de paiement. Un paiement par facture au plus.",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@inscription.suivifacture",
+      "aggregation": [["sum", ["field", "@inscription.suivifacture.montant", null]]]
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "Factures",
+  "type": "model",
+  "display": "table",
+  "description": "Une ligne par facture, avec la société du stagiaire facturé. Le montant est hors taxes, avant remise (aucune facture de 2011 n'a de remise). 105 factures n'ont pas de date : elles comptent dans le total, dans aucune année.",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@inscription.facture",
+      "joins": [
+        {"alias": "Inscriptionfacture", "source-table": "@inscription.inscriptionfacture", "strategy": "left-join", "fields": "none",
+         "condition": ["=", ["field", "@inscription.facture.facturecd", null],
+                            ["field", "@inscription.inscriptionfacture.facturecd", {"join-alias": "Inscriptionfacture"}]]},
+        {"alias": "Inscription", "source-table": "@inscription.inscription", "strategy": "left-join", "fields": "none",
+         "condition": ["=", ["field", "@inscription.inscriptionfacture.inscriptionid", {"join-alias": "Inscriptionfacture"}],
+                            ["field", "@inscription.inscription.inscriptionid", {"join-alias": "Inscription"}]]},
+        {"alias": "Contact", "source-table": "@contact.contact", "strategy": "left-join", "fields": "none",
+         "condition": ["=", ["field", "@inscription.inscription.contactid", {"join-alias": "Inscription"}],
+                            ["field", "@contact.contact.contactid", {"join-alias": "Contact"}]]},
+        {"alias": "Societe", "source-table": "@contact.societe", "strategy": "left-join", "fields": "none",
+         "condition": ["=", ["field", "@contact.contact.societeid", {"join-alias": "Contact"}],
+                            ["field", "@contact.societe.societeid", {"join-alias": "Societe"}]]}
+      ],
+      "aggregation": [["count"]],
+      "breakout": [
+        ["field", "@inscription.facture.facturecd", null],
+        ["field", "@inscription.facture.datefacture", {"temporal-unit": "day"}],
+        ["field", "@inscription.facture.montantht", null],
+        ["field", "@contact.societe.nom", {"join-alias": "Societe"}]
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "Chiffre d'affaires HT de 2011 par société",
+  "display": "table",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@card:Factures",
+      "aggregation": [["metric", "@metric:Chiffre d'affaires HT"]],
+      "breakout": [["field", "nom", {"base-type": "type/Text"}]],
+      "filter": ["between", ["field", "datefacture", {"base-type": "type/Date"}], "2011-01-01", "2011-12-31"],
+      "order-by": [["desc", ["aggregation", 0]]]
+    }
+  }
+}

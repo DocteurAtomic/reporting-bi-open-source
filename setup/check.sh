@@ -25,6 +25,11 @@
 #     are checked once the rows are right. A setting is read for each metric of the answer in
 #     series_settings first, where the chart editor writes the options of a series, then at the
 #     top of visualization_settings, then the default of the line.
+#     When the exercise asks for an answer built on a saved metric (module 6), a line such as
+#     "-- check: metric Encaissements" in the first ten lines makes the check read the
+#     aggregations of the question, once the rows are right: one of them must be a metric, and
+#     that metric a card of type metric with that name. The same rows computed without the
+#     metric give 3.
 #   - "-- check: dashboard" (module 5): the dashboard saved as "Exercice NN" is checked by
 #     setup/verify-dashboard.sh. Its date filter receives the value of the line
 #     "-- check: filter 2016-01-01~2016-12-31"; each card must be connected to that filter and
@@ -38,7 +43,8 @@
 # Exit codes: 0 pass; 1 the lab or the check itself has a problem (a container stopped,
 # Metabase not answering, no API key or a refused one); 2 the question is missing, archived or
 # fails when it runs; 3 the rows differ, or the chart or one of its settings is not the one
-# asked for; 4 the columns differ (count, or numbers against text).
+# asked for, or the question does not use the metric asked for; 4 the columns differ (count,
+# or numbers against text).
 set -uo pipefail
 . "$(dirname "$0")/lib.sh"
 case "${1:-}" in [0-9][0-9]) nn=$1 ;; *) echo "usage: $0 NN" >&2; exit 1;; esac
@@ -50,7 +56,7 @@ verdict() {
     case "$(printf '%s\n' "$1" | tail -1)" in
         PASS*)            if [ "$nn" = 00 ]; then echo "Lab: ready."; else echo "Exercise $nn: passed."; fi; exit 0 ;;
         'FAIL missing'*|'FAIL error'*) exit 2 ;;
-        'FAIL rows'*|'FAIL display'*) exit 3 ;;
+        'FAIL rows'*|'FAIL display'*|'FAIL metric'*) exit 3 ;;
         'FAIL columns'*)  exit 4 ;;
         'FAIL lab'*)      exit 1 ;;
         *) echo "Check $nn: the check could not run to the end (see the message above)." >&2; exit 1 ;;
@@ -110,7 +116,7 @@ if [ ! -f "$ref" ]; then
     exit 1
 fi
 kind=$(head -5 "$ref" | sed -n -e '/^-- check: parameter /d' -e '/^-- check: display /d' \
-    -e '/^-- check: setting /d' -e 's/^-- check: *//p' | head -1)
+    -e '/^-- check: setting /d' -e '/^-- check: metric /d' -e 's/^-- check: *//p' | head -1)
 case "${kind:-card}" in
     card)         ordered=false ;;
     'card ordered') ordered=true ;;
@@ -220,11 +226,30 @@ rows=$(script | psql_lab -d pachadataformation -q -At)
 # query builder; every column but the first for a native question) name its series.
 want_display=$(head -10 "$ref" | sed -n 's/^-- check: display  *//p' | tr -d '\r' | head -1)
 settings=$(head -10 "$ref" | sed -n 's/^-- check: setting  *//p' | tr -d '\r')
+want_metric=$(head -10 "$ref" | sed -n 's/^-- check: metric  *//p' | tr -d '\r' | head -1)
 case "$(printf '%s\n' "$rows" | tail -1)" in PASS*) ;; *) verdict "$rows" ;; esac
-[ -n "$want_display$settings" ] || verdict "$rows"
+[ -n "$want_display$settings$want_metric" ] || verdict "$rows"
 printf '%s\n' "$rows"
 code=$(mb_call GET "/api/card/$id" "$tmp/card.json")
 [ "$code" = 200 ] || verdict "FAIL error: the question cannot be read (HTTP $code)"
+if [ -n "$want_metric" ]; then
+    # The metrics among the aggregations: ["metric", id] in the MBQL the API takes,
+    # ["metric", {options}, id] in the MBQL it stores; the id is the last element.
+    metric_ids=$(json_sql "$tmp/card.json" "
+        select distinct a->>-1
+          from j, jsonb_path_query(doc->'dataset_query', 'strict \$.** ? (@.type() == \"array\")') a
+         where a->>0 = 'metric'")
+    used=
+    for mid in $metric_ids; do
+        code=$(mb_call GET "/api/card/$mid" "$tmp/metric.json")
+        [ "$code" = 200 ] || continue
+        [ "$(json_sql "$tmp/metric.json" "select doc->>'type' = 'metric' and doc->>'name' = $(sql_text "$want_metric")
+                                               and not coalesce((doc->>'archived')::boolean, false) from j")" = t ] \
+            && used=$mid
+    done
+    [ -n "$used" ] || verdict "FAIL metric: the question does not use the metric \"$want_metric\" (a saved metric of that name, picked in Summarize)"
+    echo "PASS: uses the metric \"$want_metric\" (id $used)"
+fi
 if [ -n "$want_display" ]; then
     display=$(json_sql "$tmp/card.json" "select doc->>'display' from j")
     [ "$display" = "$want_display" ] \
@@ -248,4 +273,7 @@ while read -r key want default; do
     [ "$got" = "$want" ] || verdict "FAIL display: the setting $key is $got, and the exercise asks for $want"
     echo "PASS: $key is $want"
 done < <(printf '%s\n' "$settings")
-verdict "PASS: the rows, the chart and its settings are the ones asked for"
+if [ -n "$want_display$settings" ]; then
+    verdict "PASS: the rows, the chart and its settings are the ones asked for"
+fi
+verdict "PASS: the rows and the metric are the ones asked for"

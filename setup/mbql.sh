@@ -6,8 +6,14 @@
 #   "@database"                    the id of pachadataformation in Metabase
 #   "@schema.table"                the id of a table, "@inscription.facture"
 #   "@schema.table.field"          the id of a field, "@inscription.facture.montantht"
-# The names are looked up in GET /api/database/<id>/metadata (hidden tables included) by
-# PostgreSQL, in the container, like every JSON document read by these scripts.
+#   "@card:NAME"                   a saved question, model or metric used as the source of a
+#                                  query, "card__<id>": "source-table": "@card:Factures"
+#   "@metric:NAME"                 the id of a saved metric, for an aggregation:
+#                                  ["metric", "@metric:Chiffre d'affaires HT"]
+# The names of tables and fields are looked up in GET /api/database/<id>/metadata (hidden tables
+# included) by PostgreSQL, in the container, like every JSON document read by these scripts;
+# the names of questions, models and metrics by mb_card_id. A model or a metric is saved by
+# mb_save_card like a question, with "type": "model" or "type": "metric" in its template.
 #
 # mb_db_id                        prints the id of pachadataformation
 # mb_collection NAME              prints the id of the collection NAME at the root, made if missing
@@ -23,6 +29,10 @@
 #                                 ("card": "Paiements par mode", null for a text card) and its
 #                                 parameter_mappings leave out card_id; the questions must
 #                                 exist, and "@..." names are replaced as for a question
+# mb_describe_model ID FILE       names and describes the columns of the model ID: FILE is a
+#                                 JSON object {"column": {"display_name": "...",
+#                                 "description": "..."}}, merged into the result_metadata of
+#                                 the model (what the metadata editor of a model writes)
 # mb_run_card ID OUT              runs a saved question, writes the JSON answer to OUT
 # mb_run_template TEMPLATE OUT    runs the query of a template without saving it
 # mb_id REF                       prints the id of "@schema.table" or "@schema.table.field"
@@ -67,9 +77,27 @@ mb_card_id() {
          order by (c->>'id')::int desc limit 1"
 }
 
+# mb_resolve_cards TEMPLATE OUT: the template with "@card:NAME" and "@metric:NAME" replaced.
+mb_resolve_cards() {
+    local t ref kind name id value
+    t=$(cat "$1")
+    while [[ $t =~ \"@(card|metric):([^\"]+)\" ]]; do
+        ref=${BASH_REMATCH[0]} kind=${BASH_REMATCH[1]} name=${BASH_REMATCH[2]}
+        id=$(mb_card_id "$name")
+        [ -n "$id" ] || { echo "No question, model or metric named \"$name\" in Metabase" >&2; return 1; }
+        if [ "$kind" = card ]; then value="\"card__$id\""; else value=$id; fi
+        t=${t//"$ref"/"$value"}
+    done
+    printf '%s\n' "$t" > "$2"
+}
+
 # mb_resolve TEMPLATE OUT: the template with its names replaced by ids.
 mb_resolve() {
-    local db
+    local db src=$1
+    if grep -q '"@\(card\|metric\):' "$1"; then
+        mb_resolve_cards "$1" "$mb_tmp/cards-resolved.json" || return 1
+        src=$mb_tmp/cards-resolved.json
+    fi
     db=$(mb_db_id)
     [ -n "$db" ] || { echo "pachadataformation is not connected in Metabase" >&2; return 1; }
     mb_call GET "/api/database/$db/metadata?include_hidden=true" "$mb_tmp/metadata.json" >/dev/null
@@ -99,7 +127,7 @@ mb_resolve() {
             end loop;
             return t;
         end \$\$;
-        select pg_temp.resolve($(sql_text "$(cat "$1")"), $db);" > "$2"
+        select pg_temp.resolve($(sql_text "$(cat "$src")"), $db);" > "$2"
     [ -s "$2" ]
 }
 
@@ -177,6 +205,18 @@ mb_save_dashboard() {
         return 1
     fi
     printf '%s\n' "$id"
+}
+
+mb_describe_model() {
+    local id=$1 code
+    code=$(mb_call GET "/api/card/$id" "$mb_tmp/model.json")
+    [ "$code" = 200 ] || { echo "No model $id in Metabase (HTTP $code)" >&2; return 1; }
+    { printf '{"m":'; cat "$mb_tmp/model.json"; printf ',"d":'; cat "$2"; printf '}'; } > "$mb_tmp/describe.json"
+    json_sql "$mb_tmp/describe.json" "
+        select jsonb_build_object('result_metadata', jsonb_agg(c || coalesce(doc->'d'->(c->>'name'), '{}') order by n))
+          from j, jsonb_array_elements(doc->'m'->'result_metadata') with ordinality x(c, n)" > "$mb_tmp/describe-body.json"
+    code=$(mb_call PUT "/api/card/$id" "$mb_tmp/model.json" "$mb_tmp/describe-body.json")
+    [ "$code" = 200 ] || { echo "Metabase did not save the columns of the model $id (HTTP $code)" >&2; return 1; }
 }
 
 mb_run_card() {

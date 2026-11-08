@@ -1,0 +1,15 @@
+{
+  "name": "Lignes du modèle Factures",
+  "display": "table",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@card:Factures",
+      "aggregation": [["count"],
+                      ["distinct", ["field", "facturecd", {"base-type": "type/Text"}]],
+                      ["sum", ["field", "montantht", {"base-type": "type/Decimal"}]]]
+    }
+  }
+}

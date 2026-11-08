@@ -1,0 +1,6 @@
+[
+  {"term": "Chiffre d'affaires",
+   "definition": "La somme des montants hors taxes des factures (inscription.facture.montantht), chaque facture comptée une fois, rangée par date de facture. La métrique « Chiffre d'affaires HT » du modèle « Factures » le calcule. Les paiements reçus (inscription.suivifacture) sont les encaissements, un autre chiffre."},
+  {"term": "Inscription annulée",
+   "definition": "Une inscription dont la date d'annulation (inscription.inscription.dateannulation) est renseignée. Une inscription en liste d'attente (listeattente) n'est pas annulée pour autant."}
+]
