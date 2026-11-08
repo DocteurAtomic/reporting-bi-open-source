@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Clip 2.1. The metadata changes of the clip, made through the API, as Administration > Table
-# Metadata makes them in the browser:
+# Metadata makes them in the browser. The sync reads the primary keys (lecture_bi has the
+# privilege references), but not the two-column key of stage.session to stage.stagelangue:
+# it reads it as two foreign keys to stagelangue.languecd. And the database declares no key
+# from inscription.inscription.sessionid to stage.session. So:
 # - the two tables of the schema outils (nombre, tallydate) are hidden;
-# - stage.stagelangue.stageid and stage.session.sessionid become entity keys (Metabase
-#   found no primary key under lecture_bi), and inscription.inscription.sessionid a foreign
-#   key to session.sessionid (the database declares none);
-# - stage.session.stageid, that the sync read from the two-column key of stage.stagelangue
-#   as a foreign key to stagelangue.languecd (text), now points to stagelangue.stageid;
+# - stage.stagelangue.stageid becomes an entity key (one language per stage in this database,
+#   so one row per stageid), and stage.session.stageid a foreign key to it;
+# - stage.session.languecd becomes a foreign key to stage.langue.languecd, the table of the
+#   languages, instead of stagelangue.languecd, which matches every stage of the language;
+# - inscription.inscription.sessionid becomes a foreign key to stage.session.sessionid;
 # - inscription.facture.montantht is shown as "Montant HT".
 # It changes the metadata of Metabase only, never the database. It can be run again.
 # Usage: ./demos/module_02/01-metadata.sh
@@ -28,19 +31,19 @@ done
 
 stagelangue_id=$(mb_id stage.stagelangue.stageid)
 put "/api/field/$stagelangue_id" '{"semantic_type":"type/PK"}'
-echo "stage.stagelangue.stageid: entity key (one language per stage, so one row per stageid)"
-
-session_id=$(mb_id stage.session.sessionid)
-put "/api/field/$session_id" '{"semantic_type":"type/PK"}'
-echo "stage.session.sessionid: entity key"
-
-put "/api/field/$(mb_id inscription.inscription.sessionid)" \
-    "{\"semantic_type\":\"type/FK\",\"fk_target_field_id\":$session_id}"
-echo "inscription.inscription.sessionid: foreign key to stage.session.sessionid"
+echo "stage.stagelangue.stageid: entity key"
 
 put "/api/field/$(mb_id stage.session.stageid)" \
     "{\"semantic_type\":\"type/FK\",\"fk_target_field_id\":$stagelangue_id}"
 echo "stage.session.stageid: foreign key to stage.stagelangue.stageid"
+
+put "/api/field/$(mb_id stage.session.languecd)" \
+    "{\"semantic_type\":\"type/FK\",\"fk_target_field_id\":$(mb_id stage.langue.languecd)}"
+echo "stage.session.languecd: foreign key to stage.langue.languecd"
+
+put "/api/field/$(mb_id inscription.inscription.sessionid)" \
+    "{\"semantic_type\":\"type/FK\",\"fk_target_field_id\":$(mb_id stage.session.sessionid)}"
+echo "inscription.inscription.sessionid: foreign key to stage.session.sessionid"
 
 put "/api/field/$(mb_id inscription.facture.montantht)" '{"display_name":"Montant HT"}'
 echo "inscription.facture.montantht: shown as Montant HT"

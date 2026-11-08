@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Clip 2.1. What Metabase read from the database at the sync, without changing anything: the
-# foreign keys it found, the primary keys it did not find, the target of stage.session.stageid,
-# the tables of the schema outils, and the question "sessions by stage title" through the
-# foreign key of session (an implicit join), which fails while stageid points to a text column.
+# primary keys and the foreign keys it found, the targets of the two columns of the key of
+# stage.session to stage.stagelangue, the hidden tables, and the question "sessions by stage
+# title" through the foreign key of session (an implicit join), which fails while stageid
+# points to a text column.
 # Run it before and after ./demos/module_02/01-metadata.sh.
 # Usage: ./demos/module_02/01-metadata-read.sh
 set -euo pipefail
@@ -18,6 +19,8 @@ json_sql "$mb_tmp/metadata.json" "
     select 'tables: ' || (select count(*) from t)
            || ', hidden: ' || coalesce((select string_agg(tbl->>'schema' || '.' || (tbl->>'name'), ', ')
                                           from t where tbl->>'visibility_type' = 'hidden'), 'none')
+    union all
+    select 'primary key columns read: ' || count(*) from f where (fl->>'database_is_pk')::boolean
     union all
     select 'foreign keys (fields): ' || count(*) from f where fl->>'semantic_type' = 'type/FK'
     union all
