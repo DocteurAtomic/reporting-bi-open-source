@@ -1,0 +1,22 @@
+{
+  "name": "Factures d'un stage",
+  "display": "table",
+  "visualization_settings": {},
+  "parameters": [
+    {"id": "f05a0010", "type": "string/=", "target": ["dimension", ["template-tag", "stage"]], "name": "Stage", "slug": "stage"},
+    {"id": "f05a0011", "type": "date/all-options", "target": ["dimension", ["template-tag", "periode"]], "name": "Période", "slug": "periode"}
+  ],
+  "dataset_query": {
+    "database": "@database",
+    "type": "native",
+    "native": {
+      "query": "select f.facturecd, f.datefacture, f.montantht\n  from inscription.facture f\n where exists (select\n                 from inscription.inscriptionfacture inf\n                 join inscription.inscription i on i.inscriptionid = inf.inscriptionid\n                 join stage.session s on s.sessionid = i.sessionid\n                 join stage.stagelangue sl on sl.stageid = s.stageid and sl.languecd = s.languecd\n                where inf.facturecd = f.facturecd\n                  and {{stage}})\n   and {{periode}}\n order by f.datefacture, f.facturecd\n",
+      "template-tags": {
+        "stage": {"id": "f05a0010", "name": "stage", "display-name": "Stage", "type": "dimension",
+                  "dimension": ["field", "@stage.stagelangue.titre", null], "widget-type": "string/=", "alias": "sl.titre"},
+        "periode": {"id": "f05a0011", "name": "periode", "display-name": "Période", "type": "dimension",
+                    "dimension": ["field", "@inscription.facture.datefacture", null], "widget-type": "date/all-options", "alias": "f.datefacture"}
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "Planning, stages les plus programmés",
+  "display": "row",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@stage.session",
+      "joins": [
+        {
+          "alias": "Stagelangue",
+          "source-table": "@stage.stagelangue",
+          "strategy": "left-join",
+          "fields": "none",
+          "condition": ["and",
+            ["=", ["field", "@stage.session.stageid", null], ["field", "@stage.stagelangue.stageid", {"join-alias": "Stagelangue"}]],
+            ["=", ["field", "@stage.session.languecd", null], ["field", "@stage.stagelangue.languecd", {"join-alias": "Stagelangue"}]]]
+        }
+      ],
+      "aggregation": [["count"]],
+      "breakout": [["field", "@stage.stagelangue.titre", {"join-alias": "Stagelangue"}]],
+      "order-by": [["desc", ["aggregation", 0]]],
+      "limit": 3
+    }
+  }
+}

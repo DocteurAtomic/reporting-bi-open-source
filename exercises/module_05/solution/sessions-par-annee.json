@@ -1,0 +1,14 @@
+{
+  "name": "Planning, sessions par année",
+  "display": "bar",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@stage.session",
+      "aggregation": [["count"]],
+      "breakout": [["field", "@stage.session.datedebut", {"temporal-unit": "year"}]]
+    }
+  }
+}

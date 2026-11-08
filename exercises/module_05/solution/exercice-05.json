@@ -1,0 +1,17 @@
+{
+  "name": "Exercice 05",
+  "parameters": [
+    {"id": "e05a0001", "name": "Année", "slug": "annee", "type": "date/all-options", "sectionId": "date"}
+  ],
+  "dashcards": [
+    {"card": "Planning, sessions par année", "row": 0, "col": 0, "size_x": 12, "size_y": 6,
+     "parameter_mappings": [{"parameter_id": "e05a0001",
+        "target": ["dimension", ["field", "@stage.session.datedebut", {"base-type": "type/Date"}], {"stage-number": 0}]}]},
+    {"card": "Planning, inscriptions par session", "row": 0, "col": 12, "size_x": 12, "size_y": 6,
+     "parameter_mappings": [{"parameter_id": "e05a0001",
+        "target": ["dimension", ["template-tag", "annee"], {"stage-number": 0}]}]},
+    {"card": "Planning, stages les plus programmés", "row": 6, "col": 0, "size_x": 24, "size_y": 6,
+     "parameter_mappings": [{"parameter_id": "e05a0001",
+        "target": ["dimension", ["field", "@stage.session.datedebut", {"base-type": "type/Date"}], {"stage-number": 0}]}]}
+  ]
+}

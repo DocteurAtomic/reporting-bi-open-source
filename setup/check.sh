@@ -25,8 +25,14 @@
 #     are checked once the rows are right. A setting is read for each metric of the answer in
 #     series_settings first, where the chart editor writes the options of a series, then at the
 #     top of visualization_settings, then the default of the line.
-#   - "-- check: dashboard" (module 5) and "-- check: permissions" (module 7): not written yet
-#     in this state of the repository.
+#   - "-- check: dashboard" (module 5): the dashboard saved as "Exercice NN" is checked by
+#     setup/verify-dashboard.sh. Its date filter receives the value of the line
+#     "-- check: filter 2016-01-01~2016-12-31"; each card must be connected to that filter and
+#     is run through the dashboard, POST /api/dashboard/<id>/dashcard/<dcid>/card/<cid>/query,
+#     the only route that applies the filter; each query of reference.sql, after its line
+#     "-- card: LABEL", must give the rows of one card. Same exit codes; a card not connected
+#     to the filter gives 3.
+#   - "-- check: permissions" (module 7): not written yet in this state of the repository.
 # The JSON answers of Metabase are read by PostgreSQL (jsonb), in the container: the script
 # needs bash and curl, nothing else.
 # Exit codes: 0 pass; 1 the lab or the check itself has a problem (a container stopped,
@@ -109,11 +115,11 @@ case "${kind:-card}" in
     card)         ordered=false ;;
     'card ordered') ordered=true ;;
     dashboard)
-        # Module 5: find the dashboard "Exercice NN", read its dashcards and their
-        # parameter_mappings, and run each card through
-        # POST /api/dashboard/<id>/dashcard/<dcid>/card/<cid>/query with the filter value.
-        echo "The check of a dashboard is not written yet in this state of the repository." >&2
-        exit 1 ;;
+        # Module 5: the dashboard "Exercice NN", card by card, by setup/verify-dashboard.sh.
+        setup/verify-dashboard.sh "Exercice $nn" "$ref"
+        code=$?
+        [ "$code" = 0 ] && echo "Exercise $nn: passed."
+        exit "$code" ;;
     permissions)
         # Module 7: read the permission graph and the collection graph, and run a query that
         # must be refused under the restricted account.

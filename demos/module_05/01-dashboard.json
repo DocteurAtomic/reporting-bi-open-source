@@ -1,0 +1,15 @@
+{
+  "name": "Tableau de bord de la facturation",
+  "parameters": [],
+  "dashcards": [
+    {"card": null, "row": 0, "col": 0, "size_x": 24, "size_y": 3,
+     "visualization_settings": {
+       "text": "Chiffres lus dans `pachadataformation`, sous le rôle `lecture_bi`.\n\n- Les paiements ne sont saisis que pour 2011 et 2012 : avant 2011, toutes les factures paraissent impayées.\n- Les 105 factures sans date de facture sont exclues des cartes par année.\n- « Paiements par mode » ne montre que 2011, l'année écrite dans la question.",
+       "virtual_card": {"name": null, "display": "text", "visualization_settings": {}, "dataset_query": {}, "archived": false}}},
+    {"card": "Factures sans paiement par année", "row": 3, "col": 0, "size_x": 12, "size_y": 6},
+    {"card": "Chiffre d'affaires par stage", "row": 3, "col": 12, "size_x": 12, "size_y": 6},
+    {"card": "Paiements par mode", "row": 9, "col": 0, "size_x": 12, "size_y": 4},
+    {"card": "Encaissements par mois", "row": 9, "col": 12, "size_x": 12, "size_y": 6},
+    {"card": "Encaissements par période", "row": 15, "col": 12, "size_x": 12, "size_y": 6}
+  ]
+}

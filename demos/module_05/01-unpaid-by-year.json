@@ -1,0 +1,28 @@
+{
+  "name": "Factures sans paiement par année",
+  "display": "bar",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@inscription.facture",
+      "joins": [
+        {
+          "alias": "Suivifacture",
+          "source-table": "@inscription.suivifacture",
+          "strategy": "left-join",
+          "fields": "none",
+          "condition": ["=",
+            ["field", "@inscription.facture.facturecd", null],
+            ["field", "@inscription.suivifacture.facturecd", {"join-alias": "Suivifacture"}]]
+        }
+      ],
+      "filter": ["and",
+        ["is-null", ["field", "@inscription.suivifacture.suivifactureid", {"join-alias": "Suivifacture"}]],
+        ["not-null", ["field", "@inscription.facture.datefacture", null]]],
+      "aggregation": [["count"]],
+      "breakout": [["field", "@inscription.facture.datefacture", {"temporal-unit": "year"}]]
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "Planning, inscriptions par session",
+  "display": "scalar",
+  "visualization_settings": {},
+  "parameters": [
+    {"id": "e05a0010", "type": "date/all-options", "target": ["dimension", ["template-tag", "annee"]], "name": "Année", "slug": "annee"}
+  ],
+  "dataset_query": {
+    "database": "@database",
+    "type": "native",
+    "native": {
+      "query": "select avg(n) as moyenne\n  from (select s.sessionid,\n               count(i.inscriptionid) filter (where i.dateannulation is null) as n\n          from stage.session s\n          left join inscription.inscription i on i.sessionid = s.sessionid\n         where {{annee}}\n         group by s.sessionid) x\n",
+      "template-tags": {
+        "annee": {"id": "e05a0010", "name": "annee", "display-name": "Année", "type": "dimension",
+                  "dimension": ["field", "@stage.session.datedebut", null], "widget-type": "date/all-options", "alias": "s.datedebut"}
+      }
+    }
+  }
+}

@@ -15,6 +15,14 @@
 # mb_save_card TEMPLATE [COLL]    creates the question of TEMPLATE in the collection COLL (an
 #                                 id; the root when empty), or replaces the question of the same
 #                                 name; prints its id
+# mb_save_dashboard TEMPLATE [COLL]  creates the dashboard of TEMPLATE in the collection COLL,
+#                                 or empties and fills again the dashboard of the same name
+#                                 there; prints its id. The template holds "name",
+#                                 "parameters" (the filters, as PUT /api/dashboard takes them)
+#                                 and "dashcards", where each card names its question
+#                                 ("card": "Paiements par mode", null for a text card) and its
+#                                 parameter_mappings leave out card_id; the questions must
+#                                 exist, and "@..." names are replaced as for a question
 # mb_run_card ID OUT              runs a saved question, writes the JSON answer to OUT
 # mb_run_template TEMPLATE OUT    runs the query of a template without saving it
 # mb_id REF                       prints the id of "@schema.table" or "@schema.table.field"
@@ -115,6 +123,60 @@ mb_save_card() {
         return 1
     fi
     json_sql "$mb_tmp/card.json" "select doc->>'id' from j"
+}
+
+mb_save_dashboard() {
+    local template=$1 coll=${2:-} name id code missing
+    mb_resolve "$template" "$mb_tmp/dash-template.json" || return 1
+    mb_call GET /api/card "$mb_tmp/cards.json" >/dev/null
+    # One document for psql: the template and the saved questions, read together.
+    { printf '{"t":'; cat "$mb_tmp/dash-template.json"; printf ',"cards":'; cat "$mb_tmp/cards.json"; printf '}'; } \
+        > "$mb_tmp/dash-input.json"
+    missing=$(json_sql "$mb_tmp/dash-input.json" "
+        select string_agg(dc->>'card', ', ')
+          from j, jsonb_array_elements(doc->'t'->'dashcards') dc
+         where dc->>'card' is not null
+           and not exists (select from jsonb_array_elements(doc->'cards') c
+                            where c->>'name' = dc->>'card' and not coalesce((c->>'archived')::boolean, false))")
+    if [ -n "$missing" ]; then
+        echo "No question named $missing in Metabase" >&2
+        return 1
+    fi
+    # The body of PUT /api/dashboard/<id>: new cards get negative ids, each question its id.
+    json_sql "$mb_tmp/dash-input.json" "
+        select jsonb_build_object('parameters', coalesce(doc->'t'->'parameters', '[]'), 'tabs', '[]'::jsonb,
+                 'dashcards', (select jsonb_agg(jsonb_build_object(
+                      'id', -n, 'card_id', c.id, 'row', dc->'row', 'col', dc->'col',
+                      'size_x', dc->'size_x', 'size_y', dc->'size_y',
+                      'visualization_settings', coalesce(dc->'visualization_settings', '{}'),
+                      'parameter_mappings', coalesce((select jsonb_agg(m || jsonb_build_object('card_id', c.id))
+                                                        from jsonb_array_elements(dc->'parameter_mappings') m), '[]'))
+                      order by n)
+                   from jsonb_array_elements(doc->'t'->'dashcards') with ordinality x(dc, n)
+                   left join lateral (select max((cd->>'id')::int) as id from jsonb_array_elements(doc->'cards') cd
+                                       where cd->>'name' = dc->>'card'
+                                         and not coalesce((cd->>'archived')::boolean, false)) c on true))
+          from j" > "$mb_tmp/dash-body.json"
+    name=$(json_sql "$mb_tmp/dash-template.json" "select doc->>'name' from j")
+    mb_call GET "/api/collection/${coll:-root}/items?models=dashboard" "$mb_tmp/items.json" >/dev/null
+    id=$(json_sql "$mb_tmp/items.json" "
+        select min((i->>'id')::int) from j, jsonb_array_elements(doc->'data') i
+         where i->>'name' = $(sql_text "$name")")
+    if [ -z "$id" ]; then
+        printf '{"name":%s,"collection_id":%s}' "$(json_text "$name")" "${coll:-null}" > "$mb_tmp/dash-new.json"
+        code=$(mb_call POST /api/dashboard "$mb_tmp/dash.json" "$mb_tmp/dash-new.json")
+        if [ "$code" != 200 ]; then
+            echo "Metabase did not create the dashboard \"$name\" (HTTP $code)" >&2
+            return 1
+        fi
+        id=$(json_sql "$mb_tmp/dash.json" "select doc->>'id' from j")
+    fi
+    code=$(mb_call PUT "/api/dashboard/$id" "$mb_tmp/dash.json" "$mb_tmp/dash-body.json")
+    if [ "$code" != 200 ]; then
+        echo "Metabase did not save the cards of \"$name\" (HTTP $code)" >&2
+        return 1
+    fi
+    printf '%s\n' "$id"
 }
 
 mb_run_card() {
