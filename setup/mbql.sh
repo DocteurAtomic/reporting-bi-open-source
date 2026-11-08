@@ -35,6 +35,7 @@
 #                                 "description": "..."}}, merged into the result_metadata of
 #                                 the model (what the metadata editor of a model writes)
 # mb_run_card ID OUT              runs a saved question, writes the JSON answer to OUT
+# mb_sync SCHEMA.TABLE            syncs pachadataformation in Metabase and waits for the table
 # mb_run_template TEMPLATE OUT    runs the query of a template without saving it
 # mb_id REF                       prints the id of "@schema.table" or "@schema.table.field"
 # mb_rows FILE                    prints the rows of an answer, one per line, columns
@@ -248,4 +249,25 @@ mb_run_template() {
     mb_resolve "$1" "$mb_tmp/run-body.json" || return 1
     json_sql "$mb_tmp/run-body.json" "select doc->'dataset_query' from j" > "$mb_tmp/run-query.json"
     mb_call POST /api/dataset "$2" "$mb_tmp/run-query.json" >/dev/null
+}
+
+# mb_sync SCHEMA.TABLE: asks Metabase to sync the schema of pachadataformation (what Admin >
+# Databases > Sync database schema now does) and waits, up to 30 seconds, until the table or
+# the view SCHEMA.TABLE is in its metadata with its fields. A table created after the last sync,
+# such as those of module 8 in the schema entrepot, is unknown to Metabase until then.
+mb_sync() {
+    local schema=${1%%.*} table=${1#*.} db n
+    db=$(mb_db_id)
+    [ -n "$db" ] || { echo "pachadataformation is not connected in Metabase" >&2; return 1; }
+    mb_call POST "/api/database/$db/sync_schema" "$mb_tmp/sync.json" >/dev/null
+    for _ in $(seq 30); do
+        mb_call GET "/api/database/$db/metadata?include_hidden=true" "$mb_tmp/metadata.json" >/dev/null
+        n=$(json_sql "$mb_tmp/metadata.json" "
+            select count(*) from j, jsonb_array_elements(doc->'tables') x, jsonb_array_elements(x->'fields') f
+             where x->>'schema' = $(sql_text "$schema") and x->>'name' = $(sql_text "$table")")
+        [ "${n:-0}" -gt 0 ] && return 0
+        sleep 1
+    done
+    echo "Metabase does not see $1 after a sync of 30 seconds: does it exist, and can lecture_bi read it?" >&2
+    return 1
 }

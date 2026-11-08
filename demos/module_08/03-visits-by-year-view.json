@@ -1,0 +1,15 @@
+{
+  "name": "Visites par année (vue matérialisée)",
+  "description": "Le nombre de visites par année, somme des mois de la vue matérialisée entrepot.visites_par_mois. Les visites s'additionnent ; les visiteurs distincts, non.",
+  "display": "bar",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@entrepot.visites_par_mois",
+      "aggregation": [["sum", ["field", "@entrepot.visites_par_mois.visites", null]]],
+      "breakout": [["field", "@entrepot.visites_par_mois.mois", {"temporal-unit": "year"}]]
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "Visites par année",
+  "description": "Le nombre de visites du catalogue en ligne par année, lu dans la table de faits entrepot.visite.",
+  "display": "bar",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@entrepot.visite",
+      "aggregation": [["count"]],
+      "breakout": [["field", "@entrepot.visite.jour", {"temporal-unit": "year"}]]
+    }
+  }
+}

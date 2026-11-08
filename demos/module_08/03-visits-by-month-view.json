@@ -1,0 +1,16 @@
+{
+  "name": "Visites et visiteurs par mois (vue matérialisée)",
+  "description": "Les visites et les visiteurs distincts par mois, lus dans la vue matérialisée entrepot.visites_par_mois : 72 lignes au lieu de 5 000 000. Les visiteurs ne s'additionnent pas d'un mois à l'autre.",
+  "display": "line",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@entrepot.visites_par_mois",
+      "aggregation": [["sum", ["field", "@entrepot.visites_par_mois.visites", null]],
+                      ["sum", ["field", "@entrepot.visites_par_mois.visiteurs", null]]],
+      "breakout": [["field", "@entrepot.visites_par_mois.mois", {"temporal-unit": "month"}]]
+    }
+  }
+}

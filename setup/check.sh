@@ -30,6 +30,12 @@
 #     aggregations of the question, once the rows are right: one of them must be a metric, and
 #     that metric a card of type metric with that name. The same rows computed without the
 #     metric give 3.
+#     When the exercise asks for an answer read from a materialized view (module 8), a line
+#     such as "-- check: source materialized view entrepot" in the first ten lines makes the
+#     check read what the question reads, once the rows are right: the source tables of the
+#     query builder, or the names schema.name written in the SQL of a native question. One of
+#     them must be a materialized view of that schema, and none of them a table of that schema.
+#     The same rows read from the fact table give 3.
 #   - "-- check: dashboard" (module 5): the dashboard saved as "Exercice NN" is checked by
 #     setup/verify-dashboard.sh. Its date filter receives the value of the line
 #     "-- check: filter 2016-01-01~2016-12-31"; each card must be connected to that filter and
@@ -48,7 +54,8 @@
 # Exit codes: 0 pass; 1 the lab or the check itself has a problem (a container stopped,
 # Metabase not answering, no API key or a refused one); 2 the question is missing, archived or
 # fails when it runs; 3 the rows differ, or the chart or one of its settings is not the one
-# asked for, or the question does not use the metric asked for; 4 the columns differ (count,
+# asked for, or the question does not use the metric asked for, or reads a table where the
+# exercise asks for a materialized view; 4 the columns differ (count,
 # or numbers against text).
 set -uo pipefail
 . "$(dirname "$0")/lib.sh"
@@ -61,7 +68,7 @@ verdict() {
     case "$(printf '%s\n' "$1" | tail -1)" in
         PASS*)            if [ "$nn" = 00 ]; then echo "Lab: ready."; else echo "Exercise $nn: passed."; fi; exit 0 ;;
         'FAIL missing'*|'FAIL error'*) exit 2 ;;
-        'FAIL rows'*|'FAIL display'*|'FAIL metric'*) exit 3 ;;
+        'FAIL rows'*|'FAIL display'*|'FAIL metric'*|'FAIL source'*) exit 3 ;;
         'FAIL columns'*)  exit 4 ;;
         'FAIL lab'*)      exit 1 ;;
         *) echo "Check $nn: the check could not run to the end (see the message above)." >&2; exit 1 ;;
@@ -141,7 +148,7 @@ if [ ! -f "$ref" ]; then
     exit 1
 fi
 kind=$(head -5 "$ref" | sed -n -e '/^-- check: parameter /d' -e '/^-- check: display /d' \
-    -e '/^-- check: setting /d' -e '/^-- check: metric /d' -e 's/^-- check: *//p' | head -1)
+    -e '/^-- check: setting /d' -e '/^-- check: metric /d' -e '/^-- check: source /d' -e 's/^-- check: *//p' | head -1)
 case "${kind:-card}" in
     card)         ordered=false ;;
     'card ordered') ordered=true ;;
@@ -254,8 +261,9 @@ rows=$(script | psql_lab -d pachadataformation -q -At)
 want_display=$(head -10 "$ref" | sed -n 's/^-- check: display  *//p' | tr -d '\r' | head -1)
 settings=$(head -10 "$ref" | sed -n 's/^-- check: setting  *//p' | tr -d '\r')
 want_metric=$(head -10 "$ref" | sed -n 's/^-- check: metric  *//p' | tr -d '\r' | head -1)
+want_source=$(head -10 "$ref" | sed -n 's/^-- check: source  *//p' | tr -d '\r' | head -1)
 case "$(printf '%s\n' "$rows" | tail -1)" in PASS*) ;; *) verdict "$rows" ;; esac
-[ -n "$want_display$settings$want_metric" ] || verdict "$rows"
+[ -n "$want_display$settings$want_metric$want_source" ] || verdict "$rows"
 printf '%s\n' "$rows"
 code=$(mb_call GET "/api/card/$id" "$tmp/card.json")
 [ "$code" = 200 ] || verdict "FAIL error: the question cannot be read (HTTP $code)"
@@ -276,6 +284,43 @@ if [ -n "$want_metric" ]; then
     done
     [ -n "$used" ] || verdict "FAIL metric: the question does not use the metric \"$want_metric\" (a saved metric of that name, picked in Summarize)"
     echo "PASS: uses the metric \"$want_metric\" (id $used)"
+fi
+if [ -n "$want_source" ]; then
+    # The relations the question reads: the tables of the query builder (source-table of every
+    # stage and join, looked up by GET /api/table/<id>), or, for a native question, the names
+    # written schema.name in its SQL. Each one is then looked up in PostgreSQL (pg_class).
+    src_schema=${want_source##* }
+    read_rels=
+    for tid in $(json_sql "$tmp/card.json" "
+            select distinct t::text from j, jsonb_path_query(doc->'dataset_query', 'lax \$.**.\"source-table\"') t
+             where jsonb_typeof(t) = 'number'"); do
+        code=$(mb_call GET "/api/table/$tid" "$tmp/table.json")
+        [ "$code" = 200 ] && read_rels="$read_rels $(json_sql "$tmp/table.json" "select doc->>'schema' || '.' || (doc->>'name') from j")"
+    done
+    read_rels="$read_rels $(json_sql "$tmp/card.json" "
+        select string_agg(distinct m[1] || '.' || m[2], ' ')
+          from j, lateral (select coalesce(doc->'dataset_query'->'stages'->0->>'native',
+                                           doc->'dataset_query'->'native'->>'query', '') as q) n,
+               regexp_matches(lower(n.q), '\m(' || $(sql_text "$src_schema") || ')\.\"?([a-z_][a-z0-9_]*)', 'g') m")"
+    rel_list=$(printf '%s\n' $read_rels | sed -n "s/.*/'&'/p" | paste -sd, -)
+    verdict_source=$(psql_lab -d pachadataformation -At <<SQL
+select case
+    when count(*) filter (where r.n like $(sql_text "$src_schema") || '.%') = 0
+        then 'FAIL source: the question reads ' || coalesce(nullif(string_agg(r.n, ', '), ''), 'no table')
+             || ', and the exercise asks for a materialized view of the schema ' || $(sql_text "$src_schema")
+    when bool_or(r.n like $(sql_text "$src_schema") || '.%' and coalesce(c.relkind, '-') <> 'm')
+        then 'FAIL source: the question reads '
+             || string_agg(r.n, ', ') filter (where r.n like $(sql_text "$src_schema") || '.%' and coalesce(c.relkind, '-') <> 'm')
+             || ', which is not a materialized view: the exercise asks for the materialized view, not the table it is computed from'
+    else 'PASS: reads the materialized view '
+         || string_agg(r.n, ', ') filter (where r.n like $(sql_text "$src_schema") || '.%')
+    end
+  from unnest(array[${rel_list:-''}]::text[]) r(n)
+  left join pg_class c on c.oid = to_regclass(r.n)
+ where r.n <> '';
+SQL
+)
+    case "$verdict_source" in PASS*) echo "$verdict_source" ;; *) verdict "$verdict_source" ;; esac
 fi
 if [ -n "$want_display" ]; then
     display=$(json_sql "$tmp/card.json" "select doc->>'display' from j")
@@ -302,5 +347,8 @@ while read -r key want default; do
 done < <(printf '%s\n' "$settings")
 if [ -n "$want_display$settings" ]; then
     verdict "PASS: the rows, the chart and its settings are the ones asked for"
+fi
+if [ -n "$want_source" ] && [ -z "$want_metric" ]; then
+    verdict "PASS: the rows and the source are the ones asked for"
 fi
 verdict "PASS: the rows and the metric are the ones asked for"

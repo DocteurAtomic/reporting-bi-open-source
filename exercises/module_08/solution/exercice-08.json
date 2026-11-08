@@ -1,0 +1,15 @@
+{
+  "name": "Exercice 08",
+  "display": "table",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@entrepot.visites_par_stage",
+      "aggregation": [["sum", ["field", "@entrepot.visites_par_stage.visites", null]],
+                      ["sum", ["field", "@entrepot.visites_par_stage.duree", null]]],
+      "breakout": [["field", "@entrepot.visites_par_stage.mois", {"temporal-unit": "year"}]]
+    }
+  }
+}

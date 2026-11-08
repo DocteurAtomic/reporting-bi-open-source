@@ -1,0 +1,12 @@
+{
+  "name": "Visites du catalogue",
+  "parameters": [],
+  "dashcards": [
+    {"card": null, "row": 0, "col": 0, "size_x": 24, "size_y": 2,
+     "visualization_settings": {
+       "text": "Visites des pages du catalogue en ligne, de 2015 à 2020, lues dans `entrepot.visite` : une table de 5 000 000 lignes fabriquée pour le cours par `setup/volume.sh`.",
+       "virtual_card": {"name": null, "display": "text", "visualization_settings": {}, "dataset_query": {}, "archived": false}}},
+    {"card": "Visites et visiteurs par mois", "row": 2, "col": 0, "size_x": 16, "size_y": 7},
+    {"card": "Visites par année", "row": 2, "col": 16, "size_x": 8, "size_y": 7}
+  ]
+}
