@@ -1,0 +1,15 @@
+{
+  "name": "Sessions par stage",
+  "display": "table",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@stage.session",
+      "aggregation": [["count"]],
+      "breakout": [["field", "@stage.stagelangue.titre", {"source-field": "@stage.session.stageid"}]],
+      "order-by": [["desc", ["aggregation", 0]]]
+    }
+  }
+}

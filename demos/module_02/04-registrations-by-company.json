@@ -1,0 +1,27 @@
+{
+  "name": "Inscriptions par société",
+  "display": "table",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@inscription.inscription",
+      "joins": [
+        {"alias": "Contact", "source-table": "@contact.contact", "strategy": "left-join", "fields": "none",
+         "condition": ["=", ["field", "@inscription.inscription.contactid", null],
+                            ["field", "@contact.contact.contactid", {"join-alias": "Contact"}]]},
+        {"alias": "Societe", "source-table": "@contact.societe", "strategy": "left-join", "fields": "none",
+         "condition": ["=", ["field", "@contact.contact.societeid", {"join-alias": "Contact"}],
+                            ["field", "@contact.societe.societeid", {"join-alias": "Societe"}]]}
+      ],
+      "expressions": {"Société": ["case",
+        [[["is-null", ["field", "@contact.contact.contactid", {"join-alias": "Contact"}]], "Sans contact"],
+         [["is-null", ["field", "@contact.societe.nom", {"join-alias": "Societe"}]], "Sans société"]],
+        {"default": ["field", "@contact.societe.nom", {"join-alias": "Societe"}]}]},
+      "aggregation": [["count"]],
+      "breakout": [["expression", "Société"]],
+      "order-by": [["desc", ["aggregation", 0]]]
+    }
+  }
+}

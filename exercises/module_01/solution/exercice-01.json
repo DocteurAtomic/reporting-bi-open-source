@@ -8,9 +8,9 @@
     "database": "@database",
     "type": "query",
     "query": {
-      "source-table": "@table:contact.contact",
+      "source-table": "@contact.contact",
       "aggregation": [["count"]],
-      "breakout": [["field", "@field:contact.contact.titre", null]]
+      "breakout": [["field", "@contact.contact.titre", null]]
     }
   }
 }

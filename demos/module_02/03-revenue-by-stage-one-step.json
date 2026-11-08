@@ -1,0 +1,32 @@
+{
+  "name": "Chiffre d'affaires par stage, un seul résumé",
+  "display": "table",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@inscription.facture",
+      "joins": [
+        {"alias": "Inscriptionfacture", "source-table": "@inscription.inscriptionfacture", "strategy": "left-join", "fields": "none",
+         "condition": ["=", ["field", "@inscription.facture.facturecd", null],
+                            ["field", "@inscription.inscriptionfacture.facturecd", {"join-alias": "Inscriptionfacture"}]]},
+        {"alias": "Inscription", "source-table": "@inscription.inscription", "strategy": "left-join", "fields": "none",
+         "condition": ["=", ["field", "@inscription.inscriptionfacture.inscriptionid", {"join-alias": "Inscriptionfacture"}],
+                            ["field", "@inscription.inscription.inscriptionid", {"join-alias": "Inscription"}]]},
+        {"alias": "Session", "source-table": "@stage.session", "strategy": "left-join", "fields": "none",
+         "condition": ["=", ["field", "@inscription.inscription.sessionid", {"join-alias": "Inscription"}],
+                            ["field", "@stage.session.sessionid", {"join-alias": "Session"}]]},
+        {"alias": "Stagelangue", "source-table": "@stage.stagelangue", "strategy": "left-join", "fields": "none",
+         "condition": ["and",
+           ["=", ["field", "@stage.session.stageid", {"join-alias": "Session"}],
+                 ["field", "@stage.stagelangue.stageid", {"join-alias": "Stagelangue"}]],
+           ["=", ["field", "@stage.session.languecd", {"join-alias": "Session"}],
+                 ["field", "@stage.stagelangue.languecd", {"join-alias": "Stagelangue"}]]]}
+      ],
+      "aggregation": [["sum", ["field", "@inscription.facture.montantht", null]]],
+      "breakout": [["field", "@stage.stagelangue.titre", {"join-alias": "Stagelangue"}]],
+      "order-by": [["desc", ["aggregation", 0]]]
+    }
+  }
+}

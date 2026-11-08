@@ -1,0 +1,29 @@
+{
+  "name": "Paiements par mode",
+  "display": "table",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@inscription.suivifacture",
+      "joins": [
+        {
+          "alias": "Modepaiement",
+          "source-table": "@reference.modepaiement",
+          "strategy": "left-join",
+          "fields": "none",
+          "condition": ["=",
+            ["field", "@inscription.suivifacture.typepaiement", null],
+            ["field", "@reference.modepaiement.modepaiementcd", {"join-alias": "Modepaiement"}]]
+        }
+      ],
+      "filter": ["between", ["field", "@inscription.suivifacture.datepaiement", null], "2011-01-01", "2011-12-31"],
+      "aggregation": [["count"], ["sum", ["field", "@inscription.suivifacture.montant", null]]],
+      "breakout": [
+        ["field", "@inscription.suivifacture.typepaiement", null],
+        ["field", "@reference.modepaiement.libelle", {"join-alias": "Modepaiement"}]
+      ]
+    }
+  }
+}

@@ -9,9 +9,9 @@
     "database": "@database",
     "type": "query",
     "query": {
-      "source-table": "@table:stage.session",
+      "source-table": "@stage.session",
       "aggregation": [["count"]],
-      "breakout": [["field", "@field:stage.session.datedebut", {"temporal-unit": "year"}]]
+      "breakout": [["field", "@stage.session.datedebut", {"temporal-unit": "year"}]]
     }
   }
 }
