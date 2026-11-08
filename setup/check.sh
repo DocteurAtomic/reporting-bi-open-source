@@ -37,7 +37,12 @@
 #     the only route that applies the filter; each query of reference.sql, after its line
 #     "-- card: LABEL", must give the rows of one card. Same exit codes; a card not connected
 #     to the filter gives 3.
-#   - "-- check: permissions" (module 7): not written yet in this state of the repository.
+#   - "-- check: permissions" (module 7): the group named by the line "-- check: group NAME" is
+#     checked by setup/verify-permissions.sh: its account, its rights on the connections in the
+#     permission graph, the collection it must not open, and the same tried under a temporary
+#     API key of the group (a count allowed on its connection, compared with the query of
+#     reference.sql; a table of another connection, SQL, and the collection, refused). Same exit
+#     codes; a right wider than the one asked gives 3.
 # The JSON answers of Metabase are read by PostgreSQL (jsonb), in the container: the script
 # needs bash and curl, nothing else.
 # Exit codes: 0 pass; 1 the lab or the check itself has a problem (a container stopped,
@@ -72,39 +77,59 @@ code=$(mb_call GET /api/database "$tmp/databases.json")
 [ "$code" = 200 ] || verdict "FAIL lab: Metabase refuses the API key of .env (HTTP $code); make a new one with ./setup/api-key.sh --force"
 
 if [ "$nn" = 00 ]; then
-    # The databases connected in Metabase, the sample database (is_sample) apart.
-    IFS='|' read -r n samples db_engine dbname user < <(json_sql "$tmp/databases.json" "
-        select count(*) filter (where not s), count(*) filter (where s),
-               max(d->>'engine') filter (where not s), max(d->'details'->>'dbname') filter (where not s),
-               max(d->'details'->>'user') filter (where not s)
+    # The databases connected in Metabase, the sample database (is_sample) apart. One of them
+    # is pachadataformation read as lecture_bi; module 7 adds pachadataformation read as
+    # lecture_planning and as lecture_facturation (setup/roles.sh). Any other is reported.
+    IFS='|' read -r n main samples others < <(json_sql "$tmp/databases.json" "
+        select count(*) filter (where not s),
+               count(*) filter (where not s and d->>'engine' = 'postgres'
+                                  and d->'details'->>'dbname' = 'pachadataformation'
+                                  and d->'details'->>'user' = 'lecture_bi'),
+               count(*) filter (where s),
+               coalesce(string_agg(format('%s (%s, %s as %s)', d->>'name', d->>'engine',
+                                          coalesce(d->'details'->>'dbname', '-'), coalesce(d->'details'->>'user', '-')), ', ')
+                        filter (where not s and not (d->>'engine' = 'postgres'
+                                  and d->'details'->>'dbname' = 'pachadataformation'
+                                  and coalesce(d->'details'->>'user', '') in ('lecture_bi', 'lecture_planning', 'lecture_facturation'))), '')
           from j, jsonb_array_elements(case jsonb_typeof(doc) when 'array' then doc else doc->'data' end) d,
                lateral (select coalesce((d->>'is_sample')::boolean, false) as s) x")
-    [ "${n:-0}" = 1 ] || verdict "FAIL lab: ${n:-0} databases connected in Metabase besides the sample database, 1 expected (pachadataformation)"
-    [ "$db_engine" = postgres ] && [ "$dbname" = pachadataformation ] \
-        || verdict "FAIL lab: the database connected in Metabase is $dbname ($db_engine), not pachadataformation (postgres)"
-    [ "$user" = lecture_bi ] || verdict "FAIL lab: Metabase connects to pachadataformation as $user, not as lecture_bi"
+    [ "${main:-0}" -ge 1 ] || verdict "FAIL lab: no connection of Metabase reads pachadataformation (postgres) as lecture_bi (module 1 connects it)"
+    [ "${main:-0}" = 1 ] || verdict "FAIL lab: $main connections of Metabase read pachadataformation as lecture_bi, 1 expected"
+    [ -z "$others" ] || verdict "FAIL lab: unexpected connection in Metabase: $others; the lab expects pachadataformation as lecture_bi, and as lecture_planning and lecture_facturation from module 7"
+    if [ "${n:-0}" -gt 1 ]; then
+        echo "Note: $((n - 1)) connection(s) of module 7 besides pachadataformation as lecture_bi."
+    fi
     if [ "${samples:-0}" != 0 ]; then
         echo "Note: the sample database is still in Metabase (module 1 removes it, module 9 brings it back)."
     fi
+    # lecture_bi, and the roles of module 7 when they exist, can only connect, use and read.
     verdict "$(psql_lab -d pachadataformation -At <<'SQL'
-select case
-    when r.rolname is null then 'FAIL lab: the role lecture_bi does not exist; run ./setup/install.sh'
-    when r.rolsuper or r.rolcreatedb or r.rolcreaterole or r.rolbypassrls
-        then 'FAIL lab: lecture_bi has more than connect, usage and select (superuser, createdb, createrole or bypassrls)'
-    when not r.rolcanlogin then 'FAIL lab: lecture_bi cannot log in'
-    when not has_database_privilege('lecture_bi', 'pachadataformation', 'CONNECT')
-        then 'FAIL lab: lecture_bi cannot connect to pachadataformation'
-    when has_database_privilege('lecture_bi', 'pachadataformation', 'CREATE')
-      or has_schema_privilege('lecture_bi', 'public', 'CREATE')
-        then 'FAIL lab: lecture_bi can create objects in pachadataformation'
-    when not has_table_privilege('lecture_bi', 'contact.societe', 'SELECT')
-        then 'FAIL lab: lecture_bi cannot read contact.societe'
-    when exists (select from information_schema.role_table_grants
-                  where grantee = 'lecture_bi' and privilege_type not in ('SELECT', 'REFERENCES'))
-        then 'FAIL lab: lecture_bi can write in a table'
-    else 'PASS: Metabase answers, the API key is accepted, one database (pachadataformation as lecture_bi), lecture_bi only reads'
-    end
-  from (select 1) one left join pg_roles r on r.rolname = 'lecture_bi';
+select coalesce(
+    (select string_agg(msg, E'\n') from (
+        select case
+            when r.rolname is null then 'FAIL lab: the role lecture_bi does not exist; run ./setup/install.sh'
+            when r.rolsuper or r.rolcreatedb or r.rolcreaterole or r.rolbypassrls
+                then format('FAIL lab: %s has more than connect, usage and select (superuser, createdb, createrole or bypassrls)', v.name)
+            when not r.rolcanlogin then format('FAIL lab: %s cannot log in', v.name)
+            when not has_database_privilege(v.name, 'pachadataformation', 'CONNECT')
+                then format('FAIL lab: %s cannot connect to pachadataformation', v.name)
+            when has_database_privilege(v.name, 'pachadataformation', 'CREATE')
+              or has_schema_privilege(v.name, 'public', 'CREATE')
+                then format('FAIL lab: %s can create objects in pachadataformation', v.name)
+            when v.name = 'lecture_bi' and not has_table_privilege(v.name, 'contact.societe', 'SELECT')
+                then 'FAIL lab: lecture_bi cannot read contact.societe'
+            when exists (select from information_schema.role_table_grants
+                          where grantee = v.name and privilege_type not in ('SELECT', 'REFERENCES'))
+                then format('FAIL lab: %s can write in a table', v.name)
+            end as msg, v.n
+          from (values (1, 'lecture_bi'), (2, 'lecture_planning'), (3, 'lecture_facturation')) v(n, name)
+          left join pg_roles r on r.rolname = v.name
+         where v.name = 'lecture_bi' or r.rolname is not null
+         order by v.n) f
+      where msg is not null),
+    case when (select count(*) from pg_roles where rolname in ('lecture_planning', 'lecture_facturation')) = 0
+         then 'PASS: Metabase answers, the API key is accepted, one database (pachadataformation as lecture_bi), lecture_bi only reads'
+         else 'PASS: Metabase answers, the API key is accepted, pachadataformation as lecture_bi, lecture_bi and the roles of module 7 only read' end);
 SQL
 )"
 fi
@@ -127,10 +152,12 @@ case "${kind:-card}" in
         [ "$code" = 0 ] && echo "Exercise $nn: passed."
         exit "$code" ;;
     permissions)
-        # Module 7: read the permission graph and the collection graph, and run a query that
-        # must be refused under the restricted account.
-        echo "The check of permissions is not written yet in this state of the repository." >&2
-        exit 1 ;;
+        # Module 7: the group of the exercise, its rights and its collections, read in the
+        # graphs and tried under a temporary API key of the group, by setup/verify-permissions.sh.
+        setup/verify-permissions.sh "$ref"
+        code=$?
+        [ "$code" = 0 ] && echo "Exercise $nn: passed."
+        exit "$code" ;;
     *) echo "Unknown kind of check in $ref: $kind" >&2; exit 1 ;;
 esac
 

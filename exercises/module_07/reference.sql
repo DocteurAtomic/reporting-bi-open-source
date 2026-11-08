@@ -1,0 +1,11 @@
+-- check: permissions
+-- check: group Planning
+-- check: connection lecture_planning
+-- check: allowed stage.session
+-- check: refused lecture_facturation inscription.facture
+-- check: hidden collection Facturation
+-- Exercise 07: the group "Planning" creates questions on the connection read as
+-- lecture_planning, with the query builder only, nowhere else, and does not open the
+-- collection "Facturation". Under a key of the group, the count of stage.session on its
+-- connection must give this query: 3 039 sessions.
+select count(*) from stage.session;

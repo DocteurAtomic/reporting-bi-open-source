@@ -34,7 +34,9 @@ code=$(mb_call GET /api/database "$tmp/databases.json")
 db=$(json_sql "$tmp/databases.json" "
     select d->>'id'
       from j, jsonb_array_elements(case jsonb_typeof(doc) when 'array' then doc else doc->'data' end) d
-     where d->'details'->>'dbname' = 'pachadataformation' and d->>'engine' = 'postgres'")
+     where d->'details'->>'dbname' = 'pachadataformation' and d->>'engine' = 'postgres'
+       and d->'details'->>'user' = 'lecture_bi'
+     order by (d->>'id')::int limit 1")
 [ -n "$db" ] || fail "pachadataformation is not connected in Metabase"
 
 mb_call GET "/api/database/$db/fields" "$tmp/fields.json" >/dev/null

@@ -1,0 +1,33 @@
+{
+  "name": "Factures sans paiement de 2011 par mois",
+  "description": "Factures de 2011 sans aucun paiement, par mois de facture. Seuil d'alerte : 500 par mois.",
+  "display": "bar",
+  "visualization_settings": {
+    "graph.show_goal": true,
+    "graph.goal_value": 500,
+    "graph.goal_label": "Seuil"
+  },
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@inscription.facture",
+      "joins": [
+        {
+          "alias": "Suivifacture",
+          "source-table": "@inscription.suivifacture",
+          "strategy": "left-join",
+          "fields": "none",
+          "condition": ["=",
+            ["field", "@inscription.facture.facturecd", null],
+            ["field", "@inscription.suivifacture.facturecd", {"join-alias": "Suivifacture"}]]
+        }
+      ],
+      "filter": ["and",
+        ["is-null", ["field", "@inscription.suivifacture.suivifactureid", {"join-alias": "Suivifacture"}]],
+        ["between", ["field", "@inscription.facture.datefacture", null], "2011-01-01", "2011-12-31"]],
+      "aggregation": [["count"]],
+      "breakout": [["field", "@inscription.facture.datefacture", {"temporal-unit": "month"}]]
+    }
+  }
+}

@@ -15,7 +15,8 @@
 # the names of questions, models and metrics by mb_card_id. A model or a metric is saved by
 # mb_save_card like a question, with "type": "model" or "type": "metric" in its template.
 #
-# mb_db_id                        prints the id of pachadataformation
+# mb_db_id                        prints the id of pachadataformation, the connection read as
+#                                 lecture_bi (module 7 adds two more, as other roles)
 # mb_collection NAME              prints the id of the collection NAME at the root, made if missing
 # mb_card_id NAME                 prints the id of the question NAME (not archived), or nothing
 # mb_save_card TEMPLATE [COLL]    creates the question of TEMPLATE in the collection COLL (an
@@ -49,7 +50,9 @@ mb_db_id() {
         select d->>'id'
           from j, jsonb_array_elements(case jsonb_typeof(doc) when 'array' then doc else doc->'data' end) d
          where d->'details'->>'dbname' = 'pachadataformation'
+           and d->'details'->>'user' = 'lecture_bi'
            and not coalesce((d->>'is_sample')::boolean, false)
+         order by (d->>'id')::int
          limit 1"
 }
 

@@ -5,6 +5,7 @@
 # and the application database of Metabase, then starts Metabase.
 # psql runs inside the container: docker compose exec db psql -U postgres -d pachadataformation
 # Metabase: http://localhost:3000 (MBPORT in .env). SQLPage: docker compose --profile code up -d
+# The test mail server of module 7: docker compose --profile mail up -d mailpit
 services:
   db:
     image: docker.io/library/postgres:${PG_TAG:-18}
@@ -61,6 +62,18 @@ services:
       - ./site:/var/www:z
     depends_on:
       - db
+
+  mailpit:
+    # Module 7: a mail server for tests. It keeps every mail Metabase sends and shows it on
+    # http://localhost:8025 (MAILPORT in .env); nothing leaves your machine. Metabase reaches
+    # it on the compose network as mailpit, port 1025, without TLS nor password.
+    # Start it with: docker compose --profile mail up -d mailpit
+    # The digest is the one of the multi-platform index of the tag.
+    image: docker.io/axllent/mailpit:v1.31.6@sha256:23fe39e81bde596a918000b3135c0f85dc8bb4c9ea6be274b051143f3e300387
+    profiles: ["mail"]
+    container_name: ${LAB_CONTAINER:-bicourse}-mail
+    ports:
+      - "127.0.0.1:${MAILPORT:-8025}:8025"
 
 volumes:
   pgdata:
