@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# Checks the lab, or the exercise of a module.
+# Usage: ./setup/check.sh NN
+#   00 checks the lab: Metabase answers, the API key MB_API_KEY of .env is accepted, exactly one
+#   database is connected besides the sample database (pachadataformation, read as
+#   lecture_bi), and the role lecture_bi can only connect, use the schemas and read.
+#   01, 02... check the exercise of the module, whose kind is given by the first lines of
+#   exercises/module_NN/reference.sql:
+#   - "-- check: card" (the default): the question saved as "Exercice NN" is found by
+#     GET /api/search (retried for five seconds: the search index sees a new question about a
+#     second after it is saved, and keeps a deleted one for a while), confirmed by
+#     GET /api/card/<id> (neither 404 nor archived), run by POST /api/card/<id>/query, and its
+#     rows are compared with the rows of reference.sql run in psql (setup/compare-card.sql).
+#     The order of the rows is ignored, unless the line is "-- check: card ordered".
+#   - "-- check: dashboard" (module 5) and "-- check: permissions" (module 7): not written yet
+#     in this state of the repository.
+# The JSON answers of Metabase are read by PostgreSQL (jsonb), in the container: the script
+# needs bash and curl, nothing else.
+# Exit codes: 0 pass; 1 the lab or the check itself has a problem (a container stopped,
+# Metabase not answering, no API key or a refused one); 2 the question is missing, archived or
+# fails when it runs; 3 the rows differ; 4 the columns differ (count, or numbers against text).
+set -uo pipefail
+. "$(dirname "$0")/lib.sh"
+case "${1:-}" in [0-9][0-9]) nn=$1 ;; *) echo "usage: $0 NN" >&2; exit 1;; esac
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+
+verdict() {
+    [ -n "$1" ] && printf '%s\n' "$1"
+    case "$(printf '%s\n' "$1" | tail -1)" in
+        PASS*)            if [ "$nn" = 00 ]; then echo "Lab: ready."; else echo "Exercise $nn: passed."; fi; exit 0 ;;
+        'FAIL missing'*|'FAIL error'*) exit 2 ;;
+        'FAIL rows'*)     exit 3 ;;
+        'FAIL columns'*)  exit 4 ;;
+        'FAIL lab'*)      exit 1 ;;
+        *) echo "Check $nn: the check could not run to the end (see the message above)." >&2; exit 1 ;;
+    esac
+}
+
+# The checks every exercise needs: both containers, Metabase, the API key.
+lab_running "$c" || verdict "FAIL lab: the container $c (PostgreSQL) is not running; start the lab with ./setup/install.sh"
+lab_running "$mbc" || verdict "FAIL lab: the container $mbc (Metabase) is not running; start the lab with ./setup/install.sh"
+mb_healthy || verdict "FAIL lab: Metabase does not answer on $mb_url/api/health (it takes about half a minute to start)"
+[ -n "${MB_API_KEY:-}" ] || verdict "FAIL lab: no API key in .env (MB_API_KEY); make one with ./setup/api-key.sh"
+code=$(mb_call GET /api/database "$tmp/databases.json")
+[ "$code" = 200 ] || verdict "FAIL lab: Metabase refuses the API key of .env (HTTP $code); make a new one with ./setup/api-key.sh --force"
+
+if [ "$nn" = 00 ]; then
+    # The databases connected in Metabase, the sample database (is_sample) apart.
+    IFS='|' read -r n samples db_engine dbname user < <(json_sql "$tmp/databases.json" "
+        select count(*) filter (where not s), count(*) filter (where s),
+               max(d->>'engine') filter (where not s), max(d->'details'->>'dbname') filter (where not s),
+               max(d->'details'->>'user') filter (where not s)
+          from j, jsonb_array_elements(case jsonb_typeof(doc) when 'array' then doc else doc->'data' end) d,
+               lateral (select coalesce((d->>'is_sample')::boolean, false) as s) x")
+    [ "${n:-0}" = 1 ] || verdict "FAIL lab: ${n:-0} databases connected in Metabase besides the sample database, 1 expected (pachadataformation)"
+    [ "$db_engine" = postgres ] && [ "$dbname" = pachadataformation ] \
+        || verdict "FAIL lab: the database connected in Metabase is $dbname ($db_engine), not pachadataformation (postgres)"
+    [ "$user" = lecture_bi ] || verdict "FAIL lab: Metabase connects to pachadataformation as $user, not as lecture_bi"
+    if [ "${samples:-0}" != 0 ]; then
+        echo "Note: the sample database is still in Metabase (module 1 removes it, module 9 brings it back)."
+    fi
+    verdict "$(psql_lab -d pachadataformation -At <<'SQL'
+select case
+    when r.rolname is null then 'FAIL lab: the role lecture_bi does not exist; run ./setup/install.sh'
+    when r.rolsuper or r.rolcreatedb or r.rolcreaterole or r.rolbypassrls
+        then 'FAIL lab: lecture_bi has more than connect, usage and select (superuser, createdb, createrole or bypassrls)'
+    when not r.rolcanlogin then 'FAIL lab: lecture_bi cannot log in'
+    when not has_database_privilege('lecture_bi', 'pachadataformation', 'CONNECT')
+        then 'FAIL lab: lecture_bi cannot connect to pachadataformation'
+    when has_database_privilege('lecture_bi', 'pachadataformation', 'CREATE')
+      or has_schema_privilege('lecture_bi', 'public', 'CREATE')
+        then 'FAIL lab: lecture_bi can create objects in pachadataformation'
+    when not has_table_privilege('lecture_bi', 'contact.societe', 'SELECT')
+        then 'FAIL lab: lecture_bi cannot read contact.societe'
+    when exists (select from information_schema.role_table_grants
+                  where grantee = 'lecture_bi' and privilege_type <> 'SELECT')
+        then 'FAIL lab: lecture_bi can write in a table'
+    else 'PASS: Metabase answers, the API key is accepted, one database (pachadataformation as lecture_bi), lecture_bi only reads'
+    end
+  from (select 1) one left join pg_roles r on r.rolname = 'lecture_bi';
+SQL
+)"
+fi
+
+dir=exercises/module_$nn
+ref=$dir/reference.sql
+if [ ! -f "$ref" ]; then
+    echo "No $ref in this state of the repository." >&2
+    exit 1
+fi
+kind=$(head -5 "$ref" | sed -n 's/^-- check: *//p' | head -1)
+case "${kind:-card}" in
+    card)         ordered=false ;;
+    'card ordered') ordered=true ;;
+    dashboard)
+        # Module 5: find the dashboard "Exercice NN", read its dashcards and their
+        # parameter_mappings, and run each card through
+        # POST /api/dashboard/<id>/dashcard/<dcid>/card/<cid>/query with the filter value.
+        echo "The check of a dashboard is not written yet in this state of the repository." >&2
+        exit 1 ;;
+    permissions)
+        # Module 7: read the permission graph and the collection graph, and run a query that
+        # must be refused under the restricted account.
+        echo "The check of permissions is not written yet in this state of the repository." >&2
+        exit 1 ;;
+    *) echo "Unknown kind of check in $ref: $kind" >&2; exit 1 ;;
+esac
+
+# The question, by its name. The search is retried for five seconds; each card it returns is
+# confirmed by GET /api/card/<id>, the most recently changed first.
+name="Exercice $nn"
+id=
+deadline=$((SECONDS + 5))
+while :; do
+    code=$(mb_call GET "/api/search?q=Exercice%20$nn&models=card" "$tmp/search.json")
+    if [ "$code" = 200 ]; then
+        ids=$(json_sql "$tmp/search.json" "
+            select r->>'id'
+              from j, jsonb_array_elements(case jsonb_typeof(doc) when 'array' then doc else doc->'data' end) r
+             where r->>'model' = 'card' and r->>'name' = $(sql_text "$name")
+               and not coalesce((r->>'archived')::boolean, false)
+             order by r->>'updated_at' desc")
+        found=0
+        for candidate in $ids; do
+            code=$(mb_call GET "/api/card/$candidate" "$tmp/card.json")
+            if [ "$code" = 200 ] && [ "$(json_sql "$tmp/card.json" "select coalesce((doc->>'archived')::boolean, false) from j")" = f ]; then
+                found=$((found + 1))
+                [ -z "$id" ] && id=$candidate
+            fi
+        done
+        [ -n "$id" ] && break
+    fi
+    [ "$SECONDS" -ge "$deadline" ] && break
+    sleep 1
+done
+[ -n "$id" ] || verdict "FAIL missing: no question named \"$name\" in Metabase (saved, not in the trash)"
+if [ "$found" -gt 1 ]; then
+    echo "Note: $found questions are named \"$name\"; the most recently changed one is checked (id $id)."
+fi
+
+echo "Question \"$name\" (id $id):"
+code=$(mb_call POST "/api/card/$id/query" "$tmp/result.json")
+status='|'
+if [ -s "$tmp/result.json" ]; then
+    status=$(json_sql "$tmp/result.json" "
+        select coalesce(doc->>'status', '') || '|'
+               || split_part(coalesce(doc->>'error', doc->'via'->0->>'error', ''), E'\n', 1)
+          from j" 2>/dev/null) || status='|'
+fi
+[ "${status%%|*}" = completed ] || verdict "FAIL error: the question does not run (HTTP $code): ${status#*|}"
+
+script() {
+    echo '\set ON_ERROR_STOP on'
+    echo "\\set ordered $ordered"
+    echo 'create temp table j (doc jsonb);'
+    echo 'copy j from stdin;'
+    tr -d '\n\r\t' < "$tmp/result.json" | sed 's/\\/\\\\/g'
+    printf '\n\\.\n'
+    printf 'create temp view expected as\n%s\n;\n' "$(sed 's/;[[:space:]]*$//' "$ref" | tr -d '\r')"
+    cat setup/compare-card.sql
+}
+verdict "$(script | psql_lab -d pachadataformation -q -At)"

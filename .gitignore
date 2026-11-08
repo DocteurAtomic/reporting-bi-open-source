@@ -1,0 +1,5 @@
+.env
+setup/*.pgdump
+setup/*.part
+work/*
+!work/.gitkeep

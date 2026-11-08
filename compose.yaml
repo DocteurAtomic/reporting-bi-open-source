@@ -1,0 +1,66 @@
+# Lab of the course: PostgreSQL 18 with the pachadataformation database, Metabase 0.65.3 and,
+# from module 11, SQLPage.
+# Set it up with: ./setup/install.sh, which writes .env (random passwords, never committed),
+# downloads and checks the dump, restores the database, creates the read-only role lecture_bi
+# and the application database of Metabase, then starts Metabase.
+# psql runs inside the container: docker compose exec db psql -U postgres -d pachadataformation
+# Metabase: http://localhost:3000 (MBPORT in .env). SQLPage: docker compose --profile code up -d
+services:
+  db:
+    image: docker.io/library/postgres:${PG_TAG:-18}
+    container_name: ${LAB_CONTAINER:-bicourse}
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run ./setup/install.sh first, it writes .env}
+    ports:
+      - "127.0.0.1:${PGPORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+      # The z option relabels the folders for SELinux hosts (Fedora, RHEL); it changes nothing elsewhere.
+      - ./work:/work:z
+      - ./setup:/setup:ro,z
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "127.0.0.1"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  metabase:
+    # The digest is the one of the multi-platform index of the tag: the same image as the tag
+    # on an Intel or AMD machine, and the native arm64 image on an Apple Silicon Mac.
+    image: docker.io/metabase/metabase:v0.65.3@sha256:9930a9b0e6974926319f691d1e55f0f9f97996e9ab658cd0cc04d9f86b0f0c1c
+    container_name: ${LAB_CONTAINER:-bicourse}-metabase
+    environment:
+      # The application database of Metabase (questions, dashboards, users) lives in the db
+      # service, in the database metabase, owned by the role metabase.
+      MB_DB_TYPE: postgres
+      MB_DB_HOST: db
+      MB_DB_PORT: "5432"
+      MB_DB_DBNAME: metabase
+      MB_DB_USER: metabase
+      MB_DB_PASS: ${MB_DB_PASS:?run ./setup/install.sh first, it writes .env}
+      # The address the browser and Claude Code use. The OAuth flow of the MCP server
+      # (module 10) fails when it differs from the address actually used.
+      MB_SITE_URL: http://localhost:${MBPORT:-3000}
+      # Key of the AI provider of Metabot (module 9), empty until you set it in .env.
+      MB_LLM_OPENROUTER_API_KEY: ${MB_LLM_OPENROUTER_API_KEY:-}
+    ports:
+      - "127.0.0.1:${MBPORT:-3000}:3000"
+    depends_on:
+      - db
+
+  sqlpage:
+    image: docker.io/lovasoa/sqlpage:v0.47.0
+    profiles: ["code"]
+    container_name: ${LAB_CONTAINER:-bicourse}-sqlpage
+    environment:
+      # SQLPage reads the database as lecture_bi, which can only read.
+      DATABASE_URL: postgres://lecture_bi:${LECTURE_BI_PASSWORD:?run ./setup/install.sh first, it writes .env}@db:5432/pachadataformation
+    ports:
+      - "127.0.0.1:${SQLPAGEPORT:-8080}:8080"
+    volumes:
+      - ./site:/var/www:z
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
