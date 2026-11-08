@@ -80,7 +80,7 @@ select case
     when not has_table_privilege('lecture_bi', 'contact.societe', 'SELECT')
         then 'FAIL lab: lecture_bi cannot read contact.societe'
     when exists (select from information_schema.role_table_grants
-                  where grantee = 'lecture_bi' and privilege_type <> 'SELECT')
+                  where grantee = 'lecture_bi' and privilege_type not in ('SELECT', 'REFERENCES'))
         then 'FAIL lab: lecture_bi can write in a table'
     else 'PASS: Metabase answers, the API key is accepted, one database (pachadataformation as lecture_bi), lecture_bi only reads'
     end

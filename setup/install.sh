@@ -118,15 +118,19 @@ revoke connect on database metabase from public;
 revoke connect on database pachadataformation from public;
 grant connect on database pachadataformation to lecture_bi;
 \connect pachadataformation
--- Usage on every schema of the organization and select on every table, nothing else.
+-- Usage on every schema of the organization, select and references on every table, nothing
+-- else. References lets no one write: lecture_bi creates no table to hold a foreign key. It
+-- is there because information_schema shows a constraint only to a role with a privilege
+-- other than select, and Metabase reads the keys there: with select alone, it sees no
+-- primary key at all (measured on 0.65.3, 8 November 2026).
 select format('grant usage on schema %I to lecture_bi', nspname)
-     || format('; grant select on all tables in schema %I to lecture_bi', nspname)
+     || format('; grant select, references on all tables in schema %I to lecture_bi', nspname)
   from pg_namespace
  where nspname not in ('pg_catalog', 'information_schema', 'pg_toast')
    and nspname not like 'pg\_temp\_%' and nspname not like 'pg\_toast\_temp\_%' \gexec
 -- The same for the schemas and tables postgres creates later (module 8 adds the schema entrepot).
 alter default privileges for role postgres grant usage on schemas to lecture_bi;
-alter default privileges for role postgres grant select on tables to lecture_bi;
+alter default privileges for role postgres grant select, references on tables to lecture_bi;
 SQL
 } | psql_lab -d postgres -q
 echo "Role lecture_bi and database metabase ready."
