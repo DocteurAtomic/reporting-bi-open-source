@@ -54,6 +54,11 @@
 #     line by line, against the readings that reference.sql computes: one line per question,
 #     each "juste" equal to a reading, each "faux" equal to none. It checks your verdicts, not
 #     the AI. A missing file gives 2, a missing or wrong verdict 3, a line without its fields 4.
+#   - "-- check: page planning.sql" (module 11): the page site/planning.sql is asked to SQLPage
+#     in JSON and checked component by component by setup/verify-page.sh, against the queries
+#     of reference.sql that follow a line "-- component: LABEL". Metabase is not needed: the
+#     check only asks that the db and SQLPage containers run (docker compose --profile code
+#     up -d sqlpage). Same exit codes; a missing page or a query of the page that fails gives 2.
 # The JSON answers of Metabase are read by PostgreSQL (jsonb), in the container: the script
 # needs bash and curl, nothing else.
 # Exit codes: 0 pass; 1 the lab or the check itself has a problem (a container stopped,
@@ -67,6 +72,16 @@ set -uo pipefail
 case "${1:-}" in [0-9][0-9]) nn=$1 ;; *) echo "usage: $0 NN" >&2; exit 1;; esac
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+
+# Module 11: a page of SQLPage, checked by setup/verify-page.sh before the checks of Metabase,
+# which the page does not need.
+if [ "$nn" != 00 ] && [ -f "exercises/module_$nn/reference.sql" ] \
+    && head -5 "exercises/module_$nn/reference.sql" | grep -q '^-- check: page '; then
+    setup/verify-page.sh "exercises/module_$nn/reference.sql"
+    code=$?
+    [ "$code" = 0 ] && echo "Exercise $nn: passed."
+    exit "$code"
+fi
 
 verdict() {
     [ -n "$1" ] && printf '%s\n' "$1"
