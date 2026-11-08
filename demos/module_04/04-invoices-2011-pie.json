@@ -1,0 +1,16 @@
+{
+  "name": "Factures de 2011 par mois, en camembert",
+  "description": "Le camembert à éviter : les factures de 2011 par mois de facture, total au centre (clip 4.4).",
+  "display": "pie",
+  "visualization_settings": {"pie.show_total": true, "pie.percent_visibility": "inside"},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@inscription.facture",
+      "filter": ["between", ["field", "@inscription.facture.datefacture", null], "2011-01-01", "2011-12-31"],
+      "aggregation": [["count"]],
+      "breakout": [["field", "@inscription.facture.datefacture", {"temporal-unit": "month"}]]
+    }
+  }
+}

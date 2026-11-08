@@ -1,0 +1,15 @@
+{
+  "name": "Exercice 04",
+  "display": "line",
+  "visualization_settings": {"series_settings": {"count": {"line.missing": "zero"}}},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@inscription.facture",
+      "filter": ["between", ["field", "@inscription.facture.datefacture", null], "2005-01-01", "2011-12-31"],
+      "aggregation": [["count"]],
+      "breakout": [["field", "@inscription.facture.datefacture", {"temporal-unit": "year"}]]
+    }
+  }
+}

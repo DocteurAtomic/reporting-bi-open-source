@@ -1,0 +1,24 @@
+{
+  "name": "Inscriptions par stage et par année",
+  "description": "Tableau croisé des inscriptions non annulées des stages les plus suivis, par année de session, en dégradé de couleurs (clip 4.3). La source est la question « Inscriptions des stages les plus suivis ».",
+  "display": "pivot",
+  "visualization_settings": {
+    "pivot_table.column_split": {"rows": ["titre"], "columns": ["datedebut"], "values": ["count"]},
+    "table.column_formatting": [
+      {"columns": ["count"], "type": "range", "colors": ["white", "#509EE3"],
+       "min_type": null, "max_type": null, "min_value": 0, "max_value": 100, "operator": "=", "value": "", "highlight_row": false}
+    ]
+  },
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@source",
+      "aggregation": [["count"]],
+      "breakout": [
+        ["field", "titre", {"base-type": "type/Text"}],
+        ["field", "datedebut", {"base-type": "type/Date", "temporal-unit": "year"}]
+      ]
+    }
+  }
+}

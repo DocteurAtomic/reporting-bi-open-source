@@ -1,0 +1,15 @@
+{
+  "name": "Sessions par année, axe tronqué",
+  "description": "Les barres dont l'axe ne part pas de zéro : « Sessions par année, en barres » avec un axe des ordonnées de 250 à 600 (clip 4.4).",
+  "display": "bar",
+  "visualization_settings": {"graph.show_values": true, "graph.y_axis.auto_range": false, "graph.y_axis.min": 250, "graph.y_axis.max": 600},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@stage.session",
+      "aggregation": [["count"]],
+      "breakout": [["field", "@stage.session.datedebut", {"temporal-unit": "year"}]]
+    }
+  }
+}

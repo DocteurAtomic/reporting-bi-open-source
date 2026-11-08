@@ -1,0 +1,14 @@
+{
+  "name": "Sessions organisées",
+  "description": "Demande de la direction : le nombre de sessions organisées, en un nombre (clip 4.1).",
+  "display": "scalar",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@stage.session",
+      "aggregation": [["count"]]
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "Sessions par année, en barres",
+  "description": "La même question regroupée par année de début, en barres, valeurs affichées (clip 4.1).",
+  "display": "bar",
+  "visualization_settings": {"graph.show_values": true},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@stage.session",
+      "aggregation": [["count"]],
+      "breakout": [["field", "@stage.session.datedebut", {"temporal-unit": "year"}]]
+    }
+  }
+}

@@ -18,13 +18,21 @@
 #     the variable, type of the parameter, value), one line per variable, in the first ten
 #     lines: POST /api/card/<id>/query without parameters applies the default value of each
 #     variable and drops a field filter that has none, so the check passes the value itself.
+#     When the exercise asks for a way of drawing the answer, which the rows do not show, lines
+#     such as "-- check: display line" (the kind of chart of the card) and
+#     "-- check: setting line.missing zero interpolate" (a key of visualization_settings, the
+#     value wanted, and the value Metabase uses when the key is not set) in the first ten lines
+#     are checked once the rows are right. A setting is read for each metric of the answer in
+#     series_settings first, where the chart editor writes the options of a series, then at the
+#     top of visualization_settings, then the default of the line.
 #   - "-- check: dashboard" (module 5) and "-- check: permissions" (module 7): not written yet
 #     in this state of the repository.
 # The JSON answers of Metabase are read by PostgreSQL (jsonb), in the container: the script
 # needs bash and curl, nothing else.
 # Exit codes: 0 pass; 1 the lab or the check itself has a problem (a container stopped,
 # Metabase not answering, no API key or a refused one); 2 the question is missing, archived or
-# fails when it runs; 3 the rows differ; 4 the columns differ (count, or numbers against text).
+# fails when it runs; 3 the rows differ, or the chart or one of its settings is not the one
+# asked for; 4 the columns differ (count, or numbers against text).
 set -uo pipefail
 . "$(dirname "$0")/lib.sh"
 case "${1:-}" in [0-9][0-9]) nn=$1 ;; *) echo "usage: $0 NN" >&2; exit 1;; esac
@@ -36,7 +44,7 @@ verdict() {
     case "$(printf '%s\n' "$1" | tail -1)" in
         PASS*)            if [ "$nn" = 00 ]; then echo "Lab: ready."; else echo "Exercise $nn: passed."; fi; exit 0 ;;
         'FAIL missing'*|'FAIL error'*) exit 2 ;;
-        'FAIL rows'*)     exit 3 ;;
+        'FAIL rows'*|'FAIL display'*) exit 3 ;;
         'FAIL columns'*)  exit 4 ;;
         'FAIL lab'*)      exit 1 ;;
         *) echo "Check $nn: the check could not run to the end (see the message above)." >&2; exit 1 ;;
@@ -95,7 +103,8 @@ if [ ! -f "$ref" ]; then
     echo "No $ref in this state of the repository." >&2
     exit 1
 fi
-kind=$(head -5 "$ref" | sed -n '/^-- check: parameter /d; s/^-- check: *//p' | head -1)
+kind=$(head -5 "$ref" | sed -n -e '/^-- check: parameter /d' -e '/^-- check: display /d' \
+    -e '/^-- check: setting /d' -e 's/^-- check: *//p' | head -1)
 case "${kind:-card}" in
     card)         ordered=false ;;
     'card ordered') ordered=true ;;
@@ -198,4 +207,39 @@ script() {
     printf 'create temp view expected as\n%s\n;\n' "$(sed 's/;[[:space:]]*$//' "$ref" | tr -d '\r')"
     cat setup/compare-card.sql
 }
-verdict "$(script | psql_lab -d pachadataformation -q -At)"
+rows=$(script | psql_lab -d pachadataformation -q -At)
+
+# The kind of chart and its settings, once the rows are right: "-- check: display" and
+# "-- check: setting" lines of reference.sql. The metrics of the answer (the summaries of the
+# query builder; every column but the first for a native question) name its series.
+want_display=$(head -10 "$ref" | sed -n 's/^-- check: display  *//p' | tr -d '\r' | head -1)
+settings=$(head -10 "$ref" | sed -n 's/^-- check: setting  *//p' | tr -d '\r')
+case "$(printf '%s\n' "$rows" | tail -1)" in PASS*) ;; *) verdict "$rows" ;; esac
+[ -n "$want_display$settings" ] || verdict "$rows"
+printf '%s\n' "$rows"
+code=$(mb_call GET "/api/card/$id" "$tmp/card.json")
+[ "$code" = 200 ] || verdict "FAIL error: the question cannot be read (HTTP $code)"
+if [ -n "$want_display" ]; then
+    display=$(json_sql "$tmp/card.json" "select doc->>'display' from j")
+    [ "$display" = "$want_display" ] \
+        || verdict "FAIL display: the question is drawn as $display, and the exercise asks for $want_display"
+    echo "PASS: drawn as $display"
+fi
+metrics=$(json_sql "$tmp/result.json" "
+    select coalesce(string_agg(c->>'name', ',' order by i) filter (where c->>'source' = 'aggregation'),
+                    string_agg(c->>'name', ',' order by i) filter (where i > 1), '')
+      from j, jsonb_array_elements(doc->'data'->'cols') with ordinality x(c, i)")
+while read -r key want default; do
+    [ -n "$want" ] || continue
+    got=$(json_sql "$tmp/card.json" "
+        select string_agg(distinct coalesce(vs->'series_settings'->m->>$(sql_text "$key"),
+                                            vs->>$(sql_text "$key"), $(sql_text "${default:-(not set)}")), ', ')
+          from j, lateral (select coalesce(doc->'visualization_settings', '{}') as vs) v,
+               unnest(string_to_array($(sql_text "$metrics"), ',') || '{}'::text[]) m
+         where m is not null")
+    [ -z "$got" ] && got=$(json_sql "$tmp/card.json" "
+        select coalesce(doc->'visualization_settings'->>$(sql_text "$key"), $(sql_text "${default:-(not set)}")) from j")
+    [ "$got" = "$want" ] || verdict "FAIL display: the setting $key is $got, and the exercise asks for $want"
+    echo "PASS: $key is $want"
+done < <(printf '%s\n' "$settings")
+verdict "PASS: the rows, the chart and its settings are the ones asked for"

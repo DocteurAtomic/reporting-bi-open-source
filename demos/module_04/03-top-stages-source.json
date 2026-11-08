@@ -1,0 +1,11 @@
+{
+  "name": "Inscriptions des stages les plus suivis",
+  "description": "Source en SQL du tableau croisé : une ligne par inscription non annulée des dix stages les plus suivis, ex aequo compris (clip 4.3). La requête est dans 03-top-stages-registrations.sql.",
+  "display": "table",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "native",
+    "native": {"query": "@sql", "template-tags": {}}
+  }
+}
