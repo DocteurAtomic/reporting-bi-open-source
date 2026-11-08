@@ -1,6 +1,7 @@
 # The bench of the course: twenty questions a department could ask, in French like the data.
 # Q01 to Q15 have one reading; Q16 to Q20 have two or more (bench/answers.sql gives each one).
-# One line per question: Qnn|question. ./bench/metabot.sh asks them to Metabot.
+# One line per question: Qnn|question. ./bench/metabot.sh asks them to Metabot (module 9),
+# ./bench/claude.sh to Claude Code through the MCP server of Metabase (module 10).
 Q01|Combien de stages différents l'organisme a-t-il dans son catalogue ?
 Q02|Combien de sessions commencent en 2015 ?
 Q03|Quel est le chiffre d'affaires hors taxes facturé en 2011 ?

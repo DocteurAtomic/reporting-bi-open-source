@@ -1,0 +1,47 @@
+{
+  "name": "Exercice 10",
+  "display": "table",
+  "visualization_settings": {},
+  "dataset_query": {
+    "database": "@database",
+    "type": "query",
+    "query": {
+      "source-table": "@inscription.inscription",
+      "joins": [
+        {
+          "alias": "Session",
+          "source-table": "@stage.session",
+          "strategy": "inner-join",
+          "fields": "none",
+          "condition": ["=",
+            ["field", "@inscription.inscription.sessionid", null],
+            ["field", "@stage.session.sessionid", {"join-alias": "Session"}]]
+        },
+        {
+          "alias": "Contact",
+          "source-table": "@contact.contact",
+          "strategy": "inner-join",
+          "fields": "none",
+          "condition": ["=",
+            ["field", "@inscription.inscription.contactid", null],
+            ["field", "@contact.contact.contactid", {"join-alias": "Contact"}]]
+        },
+        {
+          "alias": "Societe",
+          "source-table": "@contact.societe",
+          "strategy": "inner-join",
+          "fields": "none",
+          "condition": ["=",
+            ["field", "@contact.contact.societeid", {"join-alias": "Contact"}],
+            ["field", "@contact.societe.societeid", {"join-alias": "Societe"}]]
+        }
+      ],
+      "filter": ["and",
+        ["is-null", ["field", "@inscription.inscription.dateannulation", null]],
+        ["=", ["field", "@inscription.inscription.listeattente", null], false],
+        ["between", ["field", "@stage.session.datedebut", {"join-alias": "Session"}], "2019-01-01", "2019-12-31"]],
+      "aggregation": [["count"]],
+      "breakout": [["field", "@contact.societe.nom", {"join-alias": "Societe"}]]
+    }
+  }
+}
